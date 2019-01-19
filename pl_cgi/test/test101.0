@@ -1,0 +1,16 @@
+
+<html>
+<header>
+</header
+<body>
+<h2>environment</h2>
+<pre>
+{cgi_env(A,B),format("~a:~a~n",[A,B]),fail.}
+</pre>
+
+<h2>variables</h2>
+<pre>
+{cgi_in(A,B),format("~a:~a~n",[A,B]),fail.}
+</pre>
+
+</html>

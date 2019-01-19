@@ -1,0 +1,56 @@
+#   Prolog Interface to Postgresql
+#   Copyright (C) 1999-2019  Alexander Diemand
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# Platform dependent settings to Makefile
+
+# PROLOG compiler and flags
+GPLC = gplc -C '-g' -A '-g'
+
+# C/C++ compiler and flags
+CC = gcc
+OPT = #-O3 -pipe -fomit-frame-pointer
+DEF = -D$(ARCH)
+#DEBUG = -g0  # nodebug
+DEBUG = -g
+WARN = -Wall
+PIC = -fPIC
+
+# linker for object files
+#LINK = $(GPLC) --min-pl-bips --min-fd-bips --strip  # strip
+LINK = $(GPLC)
+
+# static library
+ARFLAGS = -ruv
+RANLIB = ranlib
+
+# builds shared library; $(SHARED_LIB) defined in Makefile
+SHARED_LINK = gcc -shared -Wl,-soname,$(SHARED_LIB).$(SHLIB_MAJOR) -rdynamic
+
+# include path and library settings
+# add other include paths here, i.e. -I/usr/local/include
+ARCH_INC = -I/usr/local/postgres/include
+
+# add other linker flags here, i.e. -L/usr/local/lib
+ARCH_LDFLAGS = -L/usr/local/postgres/lib
+
+# add other libraries here, i.e. -liostream
+ARCH_LIB = -lpq
+
+# these are needed for the shared library
+PL_OBJ_BEGIN = /usr/local/gprolog-1.1.2/lib/obj_begin.o
+PL_OBJ_END = /usr/local/gprolog-1.1.2/lib/obj_end.o
+
