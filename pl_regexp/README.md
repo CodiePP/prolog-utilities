@@ -1,7 +1,7 @@
 Regular expressions in Prolog
 =============================
 
-Copyright (C) 1999-2019  Alexander Diemand
+Copyright (C) 1999-2020  Alexander Diemand
 
 
 EXAMPLES

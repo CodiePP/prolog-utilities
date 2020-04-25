@@ -1,7 +1,8 @@
 /*-------------------------------------------------------------------------*/
-/* Prolog Regexp Interface                                                 */
+/* Prolog Toolbox (GNU Prolog library)                                     */
 /*                                                                         */
-/* File  : pl_regexp.pl                                                    */
+/* Part  : Toolbox main loader                                             */
+/* File  : gp-toolbox.pl                                                   */
 /* Descr.:                                                                 */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
@@ -21,9 +22,10 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
+:- include('math.pl').
+:- include('string.pl').
+:- include('stream.pl').
+:- include('vector.pl').
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
+pl_temporary_file(Dir,Prefix,Fpath) :- temporary_file(Dir,Prefix,Fpath).
 
-:- initialization(regexp:init).

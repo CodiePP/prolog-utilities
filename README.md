@@ -88,4 +88,4 @@ read_double_[BE|LE](Stream,Res)  reads a double in ieee extended format from the
 
 Licensed under [GPL v3](LICENSE)
 
-Copyright (c) 1999-2019 Alexander Diemand
+Copyright (c) 1999-2020 Alexander Diemand

@@ -1,7 +1,7 @@
-Toolbox for SWI-Prolog
-======================
+Toolbox for Prolog
+==================
 
-Copyright (C) 1999-2019  Alexander Diemand
+Copyright (C) 1999-2020  Alexander Diemand
 
 
 EXAMPLES
@@ -14,8 +14,8 @@ in ~/.swiplrc add to the search path:
 > :- assertz(file_search_path(sbcl,'/home/<your username>/lib/sbcl')).
 
 
-HOW TO COMPILE
---------------
+HOW TO COMPILE (SWI-Prolog)
+---------------------------
 
 You might want to adapt the `.def` file for your platform.
 

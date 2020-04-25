@@ -21,9 +21,4 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
-
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
-
-:- initialization(regexp:init).
+:- foreign(pl_regexp(+codes, +codes, -term)).

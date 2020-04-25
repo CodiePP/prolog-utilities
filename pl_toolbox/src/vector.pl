@@ -6,7 +6,7 @@
 /* Descr.: Vector arithmetic                                               */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2019 Alexander Diemand                               */
+/* Copyright (C) 1999-2020 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -21,7 +21,6 @@
 /*   You should have received a copy of the GNU General Public License     */
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
-
 
 info_vector :- write('Prolog Toolbox, Vector Arithmetic'),nl,
                info_vrand_2,
@@ -64,10 +63,10 @@ vrand(N,V) :-
 
 '$vrand1'(0,Temp,Temp) :- !. % stop criterion
 '$vrand1'(N,Temp,V) :-
-        Q is random(65536) / 65536.0,
+        random(-65536.0,65536.0,R),
+        Q is R / 65536.0,
         append(Temp,[Q],Temp2),
-        N2 is N-1,
-        '$vrand1'(N2,Temp2,V).
+        '$vrand1'(N-1,Temp2,V).
 
 
 
@@ -196,5 +195,4 @@ info_vmix_4 :- write('vmix(V1,V2,V3,Res)          Res = (V1 x V2) * V3'),nl.
 vmix([X1,Y1,Z1],[X2,Y2,Z2],[X3,Y3,Z3],Res) :-
                         vprod([X1,Y1,Z1],[X2,Y2,Z2],Tt),
                         vscal(Tt,[X3,Y3,Z3],Res).
-
 

@@ -6,7 +6,7 @@
 /* Descr.: Helps with strings                                              */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2019 Alexander Diemand                               */
+/* Copyright (C) 1999-2020 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -21,7 +21,6 @@
 /*   You should have received a copy of the GNU General Public License     */
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
-
 
 info_string :- write('Prolog Toolbox, String handling'),nl,
                info_removesublist_3,
@@ -72,8 +71,8 @@ list2string(List,Sep,String) :-
 
 list2string_aux([],_,String,String) :- !.
 list2string_aux([A|R],Sep,In,String) :-
-	sformat(Tgt,'~p',[A]),
-	atom_codes(Tgt,ACodes),
+	format(Tgt,'~p',[A]),
+  %atom_codes(Tgt,ACodes),
 	( In == [] ->
 		S1 = In
 	;

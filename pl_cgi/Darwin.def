@@ -39,7 +39,7 @@ AR = ar
 ARFLAGS = -ruv
 RANLIB = ranlib
 
-# include path and library settings
+# SWI-Prolog: include path and library settings
 # add other include paths here, i.e. -I/usr/local/include
 SWI_ARCH_INC = -I${HOME}/lib/swipl-7.7.16/include/ -I${HOME}/lib/include
 
@@ -53,3 +53,4 @@ SWI_ARCH_LIBS = -lswipl
 GP_ARCH_INC = 
 GP_ARCH_LDFLAGS =
 GP_ARCH_LIBS =
+
