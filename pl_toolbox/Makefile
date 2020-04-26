@@ -46,15 +46,15 @@ SWI_OBJS = $(OBJDIR)/lowlevelroutines.o
 # other implicit rules
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo "compiling $<"
-	@$(CC) -c $(SWI_CFLAGS) -o $@ $<
+	$(CC) -c $(SWI_CFLAGS) -o $@ $<
 
 $(OBJDIR)/%.gpo : $(SRCDIR)/%.pl
 	@echo "compiling $<"
-	@$(GPLC) -c -o $@ $<
+	$(GPLC) -c -o $@ $<
 
 $(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
 	@echo "compiling $<"
-	$(SWIPL) -t "qcompile(\"$<\")."
+	$(SWIPL) -q -t "qcompile(\"$<\")."
 
 # rule to make it all
 all: $(MODULE) lib$(MODULE).a $(SRCDIR)/toolbox.qlf

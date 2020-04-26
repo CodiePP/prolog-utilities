@@ -22,21 +22,20 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- include('math.pl').
-:- include('string.pl').
-:- include('stream.pl').
-:- include('vector.pl').
-
-pl_temporary_file(Dir,Prefix,Fpath) :- temporary_file(Dir,Prefix,Fpath).
-
 /*
-info_toolbox :-
+ *   build a new top level:
+ *
+ *   gplc -o test-gp --new-top-level gp-toolbox.pl  libpltoolbox-Linux.a
+ */
+
+
+'$info_toolbox' :-
         info_math,
         info_string,
         info_stream,
         info_vector.
 
-module(toolbox, info_toolbox, [
+module(toolbox, '$info_toolbox', [
 	% math
 		pi/1, e/1, det/2, rad2grad/2, grad2rad/2,
 	% stream
@@ -63,4 +62,4 @@ module(toolbox, info_toolbox, [
 		vval/2, vsum/2, vadd/3, vsub/3, vmul/3, vdiv/3,
 		vdist/3, vscal/3, vprod/3, vmix/4
 	]).
-*/
+

@@ -20,7 +20,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include <SWI-Prolog.h>
+#include "SWI-Prolog.h"
 
 
 foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname);

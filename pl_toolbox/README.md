@@ -35,6 +35,14 @@ qcompile('toolbox').
 copy the resulting file `toolbox.qlf` to `~/lib/sbcl/toolbox.qlf`.
 
 
+GNU PROLOG top
+--------------
+
+```
+gplc -o gp-toolbox --new-top-level gp-test.pl libpltoolbox-Linux.a
+```
+
+
 LICENSE
 -------
 
