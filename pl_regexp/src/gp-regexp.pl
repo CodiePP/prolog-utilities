@@ -21,9 +21,8 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
+:- foreign(pl_regexp(+codes, +codes, term)).
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
-
-:- initialization(regexp:init).
+info_regexp :- write('Prolog Regexp Interface'),nl,
+                      %                                %
+               write('pl_regexp(Str, Regexp, Matches)  returns Matches if success'),nl.

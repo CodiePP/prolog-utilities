@@ -1,8 +1,9 @@
 /*-------------------------------------------------------------------------*/
-/* Prolog Regexp Interface                                                 */
+/* Prolog CGI handling                                                     */
 /*                                                                         */
-/* File  : pl_regexp.pl                                                    */
-/* Descr.:                                                                 */
+/* Part  : CGI Handling                                                    */
+/* File  : gp-cgi.pl                                                       */
+/* Descr.: Helps with reading and writing to/from CGI requests             */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
 /* Copyright (C) 1999-2020 Alexander Diemand                               */
@@ -21,9 +22,13 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
+:- dynamic(cgi_env/2).        % where we store the environment
+:- dynamic(cgi_in/2).         % keeps the content of the cgi variables
+:- dynamic(cgi_cookies/2).    % keeps the content of the cookies
 
-:- initialization(regexp:init).
+% compatiblity
+getenv(A,B) :- environ(A,B).
+access_file(F,P) :- file_permission(F,P).
+atom_to_term(A,T,_) :- read_term_from_atom(A,T,[]).
+

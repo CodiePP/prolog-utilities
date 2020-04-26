@@ -1,7 +1,7 @@
 Prolog CGI programming
 ======================
 
-Copyright (C) 1999-2019  Alexander Diemand
+Copyright (C) 1999-2020  Alexander Diemand
 
 
 After `init_cgi` you can set the variable cgi_env(plContentType,'text/html'), 

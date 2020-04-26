@@ -2,11 +2,11 @@
 /* Prolog CGI handling                                                     */
 /*                                                                         */
 /* Part  : CGI Handling                                                    */
-/* File  : cgi.pl                                                          */
+/* File  : common.pl                                                       */
 /* Descr.: Helps with reading and writing to/from CGI requests             */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2019 Alexander Diemand                               */
+/* Copyright (C) 1999-2020 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -22,20 +22,11 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(cgi, [
-        init_cgi/0,
-        generate_html_output/1,
-        generate_html_output/2
-    ]).
-
-% needs read_txtuntil from toolbox
-:- use_module(sbcl(toolbox), [read_txtuntil/2]).
-:- use_module(sbcl(regexp)).
-
+/*
 :- dynamic(cgi_env/2).        % where we store the environment
 :- dynamic(cgi_in/2).         % keeps the content of the cgi variables
 :- dynamic(cgi_cookies/2).    % keeps the content of the cookies
-
+*/
 
 info_cgi :- 
         write('Prolog CGI, CGI handling'),nl,
@@ -52,10 +43,10 @@ init_cgi :-
         current_input(DefInp),
         ( getenv('REQUEST_METHOD','GET'),getenv('QUERY_STRING',Query), Query \== '' ->
             % method GET in environment variable QUERY_STRING
-            %open_input_atom_stream(Query,Str), % load from environment variable
-	    atom_concat('echo "',Query, Cmd1),
-	    atom_concat(Cmd1,'"',Cmd),
-	    open(pipe(Cmd), read, Str, []),
+            open_input_atom_stream(Query,Str), % load from environment variable
+            %atom_concat('echo "',Query, Cmd1),
+            %atom_concat(Cmd1,'"',Cmd),
+            %open(pipe(Cmd), read, Str, []),
             set_input(Str),
             true
           ;
@@ -88,11 +79,11 @@ setup_environment :-
 % read_environment
 % reads the shell environment and sets up the cgi_env predicates
 read_environment :-
-        findall(X,(	member(X,['REMOTE_ADDR','UNIQUE_ID','HOSTNAME','REQUEST_METHOD','HTTP_COOKIE']),
-			getenv(X,Y), 
-			Z =.. ['cgi_env',X,Y], 
-			asserta(Z)), 
-		_).
+        findall(X,(        member(X,['REMOTE_ADDR','UNIQUE_ID','HOSTNAME','REQUEST_METHOD','HTTP_COOKIE']),
+                        getenv(X,Y), 
+                        Z =.. ['cgi_env',X,Y], 
+                        asserta(Z)), 
+                _).
 
 
 % read_cookies
@@ -102,10 +93,10 @@ read_cookies :-
         read_cookies_aux(X) ; true.
 
 read_cookies_aux(String) :- 
-        ( regexp:pl_regexp(String, '^(.*); (.+)=(.+);*$', Match) ->
+        ( pl_regexp(String, '^(.*); (.+)=(.+);*$', Match) ->
              true
           ;
-             regexp:pl_regexp(String, '^()(.+)=(.+);*$', Match)
+             pl_regexp(String, '^()(.+)=(.+);*$', Match)
         ),
         %write(Match),nl,
         read_cookies_aux2(Match).
@@ -113,8 +104,10 @@ read_cookies_aux(String) :-
 read_cookies_aux2([]) :- !.
 read_cookies_aux2([_,B,C0,D0|_]) :-
         %write(C),write('-->'),write(D),nl,
-	string_to_atom(C0,C),
-	string_to_atom(D0,D),
+        %string_to_atom(C0,C),
+        %string_to_atom(D0,D),
+        atom_codes(C,C0),
+        atom_codes(D,D0),
         X =.. ['cgi_cookies',C,D],
         asserta(X),
         read_cookies_aux(B).
@@ -136,16 +129,16 @@ info_generate_html_output :-
 
 % generate_html_output(+PredicateList,+Filename)
 % parses an HTML template file and replaces everything between @..@ with the corresponding content from a predicate given in Predlist
-	
+        
 generate_html_output(File) :- generate_html_output(['cgi_in'],File). % default in cgi_in
 generate_html_output(Predlist,File) :-
-	generate_html_output(Predlist,File,[]).
+        generate_html_output(Predlist,File,[]).
 generate_html_output(Predlist,File,Opts) :-
-	( member('no_HTML_header',Opts) -> 
-		true
-	;
-		output_html_header
-	),
+        ( member('no_HTML_header',Opts) -> 
+                true
+        ;
+                output_html_header
+        ),
         ( access_file(File,read) ->
             true
           ;
@@ -165,43 +158,43 @@ generate_html_output(Predlist,File,Opts) :-
 generate_html_output(_,_,_).  % succeeds always
 
 output_html_header :-
-	X =.. ['prepare_cookies'],
-	(catch(call(X),_,true) -> true ; true),
+        X =.. ['prepare_cookies'],
+        (catch(call(X),_,true) -> true ; true),
 
         content_type(Ctype),
         format("Content-type: ~a~n",[Ctype]),
 
-	% status
-	(cgi_env(plStatus,Status) ->
-		format("Status: ~a~n",[Status])
-	;
-		true
-	),
-	% pragmas
-	(cgi_env(plPragma,Pragma) ->
-		format("Pragma: ~a~n",[Pragma])
-	;
-		true
-	),
-	% cache control
-	(cgi_env(plCacheControl,CacheCtrl) ->
-		format("Cache-Control: ~a~n",[CacheCtrl])
-	;
-		true
-	),
-	% location
-	(cgi_env(plLocation,Loc) ->
-		format("Location: ~a~n",[Loc])
-	;
-		true
-	),
-	% Modified
-	(cgi_env(plModified,Modif) ->
-		format("Last-Modified: ~a~n",[Modif])
-	;
-		true
-	),
-	nl.
+        % status
+        (cgi_env(plStatus,Status) ->
+                format("Status: ~a~n",[Status])
+        ;
+                true
+        ),
+        % pragmas
+        (cgi_env(plPragma,Pragma) ->
+                format("Pragma: ~a~n",[Pragma])
+        ;
+                true
+        ),
+        % cache control
+        (cgi_env(plCacheControl,CacheCtrl) ->
+                format("Cache-Control: ~a~n",[CacheCtrl])
+        ;
+                true
+        ),
+        % location
+        (cgi_env(plLocation,Loc) ->
+                format("Location: ~a~n",[Loc])
+        ;
+                true
+        ),
+        % Modified
+        (cgi_env(plModified,Modif) ->
+                format("Last-Modified: ~a~n",[Modif])
+        ;
+                true
+        ),
+        nl.
 
         % now output everything to debug.file
 %        open('debug.file',write,Fstr),
@@ -232,11 +225,11 @@ parse_html(Predlist) :-
 parse_html_aux(_,-1) :- !.
 
 parse_html_aux(Predlist,92) :-   % a '\' 
-	get_code(Char),
-	(Char == 123 ->
-		put_code(Char)
-	;	put_code(92),put_code(Char)
-	),!,
+        get_code(Char),
+        (Char == 123 ->
+                put_code(Char)
+        ;        put_code(92),put_code(Char)
+        ),!,
         parse_html(Predlist).
 
 parse_html_aux(Predlist,Code) :-
@@ -252,7 +245,7 @@ interpret_html(_,-1).     % end of stream
 interpret_html(_,123) :-   % a '{' call a predicate or ignore
         read_txtuntil(125,String), % until '}'
         atom_codes(Atm,String),
-	atom_to_term(Atm, Callable, _),
+        atom_to_term(Atm, Callable, _),
         catch(call(Callable), Err, output_error(Err)),
         !.
 
@@ -265,7 +258,7 @@ interpret_html(Predlist,64) :-   % a '@' replace the tag with the predicate/2 2n
         write(OutputString).
 
 interpret_html(_,Code) :- 
-	atom_codes(Var,[Code]),write(Var).  % everything else
+        atom_codes(Var,[Code]),write(Var).  % everything else
 
 interpret_html_aux([],String,String) :- !. % if not found, simply copy
 
@@ -327,13 +320,13 @@ filter([H|R],[H|N]) :- filter(R,N). % otherwise
 % encode(+String,-String)
 % encodes some characters in the string as HTML chars
 encode(In,Out) :-
-	encode(In,[],Out).
+        encode(In,[],Out).
 encode([],Out,Out).
 encode([A|R],Curr,Out) :-
-	once(encode_char(A,X)),
-	append(Curr,X,Now),
-	encode(R,Now,Out).
-	
+        once(encode_char(A,X)),
+        append(Curr,X,Now),
+        encode(R,Now,Out).
+        
 encode_char(60,"&lt;"). % <
 encode_char(62,"&gt;"). % >
 encode_char(38,"&amp;"). % &

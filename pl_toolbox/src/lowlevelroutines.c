@@ -1,5 +1,5 @@
-/*   SWI-Prolog Toolbox
- *   Copyright (C) 1999-2019  Alexander Diemand
+/*   Prolog Toolbox
+ *   Copyright (C) 1999-2020  Alexander Diemand
  * 
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include <SWI-Prolog.h>
+#include "SWI-Prolog.h"
 
 
 foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname);

@@ -1,7 +1,7 @@
 Interface to the PostgreSQL Database Server from [GNU|SWI] Prolog
 =================================================================
 
-Copyright (C) 1999-2019  Alexander Diemand
+Copyright (C) 1999-2020  Alexander Diemand
 
 
 PREDICATES

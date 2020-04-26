@@ -21,9 +21,14 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
+/*
+ *   build a new top level:
+ *
+ *   gplc -o test-gp --new-top-level gp-regexp.pl  libplregexp-Linux.a
+ */
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
+'$info_regexp' :- info_regexp.
 
-:- initialization(regexp:init).
+module(regexp, '$info_regexp', [
+		pl_regexp/3
+	]).

@@ -1,5 +1,5 @@
 % extends SWI-Prolog's search path:
-:- assertz(file_search_path(sbcl,'/Users/axeld/lib/sbcl')).
+:- assertz(file_search_path(sbcl,'/home/axeld/lib/sbcl')).
 
 run :-
 	use_module(sbcl(cgi)),

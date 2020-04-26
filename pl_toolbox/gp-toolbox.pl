@@ -1,7 +1,8 @@
 /*-------------------------------------------------------------------------*/
-/* Prolog Regexp Interface                                                 */
+/* Prolog Toolbox (GNU Prolog library)                                     */
 /*                                                                         */
-/* File  : pl_regexp.pl                                                    */
+/* Part  : Toolbox main loader                                             */
+/* File  : gp-toolbox.pl                                                   */
 /* Descr.:                                                                 */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
@@ -21,9 +22,44 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
+/*
+ *   build a new top level:
+ *
+ *   gplc -o test-gp --new-top-level gp-toolbox.pl  libpltoolbox-Linux.a
+ */
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
 
-:- initialization(regexp:init).
+'$info_toolbox' :-
+        info_math,
+        info_string,
+        info_stream,
+        info_vector.
+
+module(toolbox, '$info_toolbox', [
+	% math
+		pi/1, e/1, det/2, rad2grad/2, grad2rad/2,
+	% stream
+		read_txtline/1, read_txtline/2,
+		read_binline/1, read_binline/2,
+		read_txtuntil/2, read_txtuntil/3,
+		read_binuntil/2, read_binuntil/3,
+		write_txtline/1, write_txtline/2,
+		write_binline/1, write_binline/2,
+		read_n_bytes/3, read_n_chars/3,
+		read_int_BE/2, read_int_LE/2,
+		read_short_BE/2, read_short_LE/2,
+		read_double_LE/2,
+	% string
+		string2list/2, string2list/3,
+		split/4,
+		remove_leading/3, remove_trailing/3,
+		sub_string/4,
+		skip/3,
+		align_left/3, align_right/3,
+		lower_case/2, upper_case/2,
+	%vector
+		vrand/2, vzero/2, vnorm/2,
+		vval/2, vsum/2, vadd/3, vsub/3, vmul/3, vdiv/3,
+		vdist/3, vscal/3, vprod/3, vmix/4
+	]).
+

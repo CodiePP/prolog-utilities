@@ -6,7 +6,7 @@
 /* Descr.: Helps with reading and writing to/from streams                  */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2019 Alexander Diemand                               */
+/* Copyright (C) 1999-2020 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -21,7 +21,6 @@
 /*   You should have received a copy of the GNU General Public License     */
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
-
 
 info_stream :- 
         write('Prolog Toolbox, Stream handling'),nl,

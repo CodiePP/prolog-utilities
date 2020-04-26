@@ -1,7 +1,7 @@
 Regular expressions in Prolog
 =============================
 
-Copyright (C) 1999-2019  Alexander Diemand
+Copyright (C) 1999-2020  Alexander Diemand
 
 
 EXAMPLES
@@ -38,6 +38,14 @@ use_module(sbcl(regexp)).
 
 The regex functions we use is implemented in the libc (at least on Linux).
 Check that the header file <regex.h> is found by the compiler in its standard place (usually: /usr/include).
+
+
+GNU PROLOG top
+--------------
+
+```
+gplc -o test-gp --new-top-level gp-regexp.pl  libplregexp-Linux.a
+```
 
 
 LICENSE
