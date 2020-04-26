@@ -2,7 +2,7 @@
 /* Prolog CGI handling                                                     */
 /*                                                                         */
 /* Part  : CGI Handling                                                    */
-/* File  : cgi.pl                                                          */
+/* File  : gp-cgi.pl                                                       */
 /* Descr.: Helps with reading and writing to/from CGI requests             */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
@@ -22,20 +22,13 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(cgi, [
-        init_cgi/0,
-        generate_html_output/1,
-        generate_html_output/2
-    ]).
-
-% needs read_txtuntil from toolbox
-:- use_module(sbcl(toolbox), [read_txtuntil/2]).
-:- use_module(sbcl(regexp)).
 
 :- dynamic(cgi_env/2).        % where we store the environment
 :- dynamic(cgi_in/2).         % keeps the content of the cgi variables
 :- dynamic(cgi_cookies/2).    % keeps the content of the cookies
 
-pl_regexp(A,B,C) :- regexp:pl_regexp(A,B,C).
+% compatiblity
+getenv(A,B) :- environ(A,B).
+access_file(F,P) :- file_permission(F,P).
+atom_to_term(A,T,_) :- read_term_from_atom(A,T,[]).
 
-:- include('common.pl').

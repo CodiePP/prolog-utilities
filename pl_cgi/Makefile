@@ -1,16 +1,16 @@
-#   Prolog Toolbox
+#   Prolog Regexp Interface
 #   Copyright (C) 1999-2020  Alexander Diemand
-# 
+#
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
 #   the Free Software Foundation, either version 3 of the License, or
 #   (at your option) any later version.
-#   
+#
 #   This program is distributed in the hope that it will be useful,
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
-#   
+#
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -35,44 +35,42 @@ MODULE = plcgi-$(ARCH)
 SRCDIR = src
 OBJDIR = obj-$(ARCH)
 
-# source files
-SWI_SRCS = $(SRCDIR)/cgi.pl
-
 GP_SRCS = $(SRCDIR)/gp-cgi.pl $(SRCDIR)/common.pl
-GP_OBJ = $(OBJDIR)/gp-cgi.gpo
+GP_OBJS = $(OBJDIR)/gp-cgi.gpo $(OBJDIR)/common.gpo
 
-# object files
-OBJS =
+SWI_SRCS = $(SRCDIR)/cgi.pl
 
 .SUFFIXES: .c
 
 # other implicit rules
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo "compiling $<"
-	@$(CC) -c $(SWI_CFLAGS) -o $@ $<
+	$(CC) -c $(SWI_CFLAGS) -o $@ $<
 
 $(OBJDIR)/%.gpo : $(SRCDIR)/%.pl
 	@echo "compiling $<"
-	@$(GPLC) -c -o $@ $<
+	$(GPLC) -c -o $@ $<
 
-%.qlf : $(SRCDIR)/%.pl
+$(OBJDIR)/%.gpo : $(SRCDIR)/%.c
 	@echo "compiling $<"
-	$(SWIPL) -t "qcompile(\"$<\")."
+	$(GPLC) -c -o $@ $<
+
+$(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
+	@echo "compiling $<"
+	$(SWIPL) -q -t "qcompile(\"$<\")."
 
 # rule to make it all
 all: $(MODULE) lib$(MODULE).a $(SRCDIR)/cgi.qlf
 
-$(GP_OBJ) : $(GP_SRCS)
+$(GP_OBJS) : $(GP_SRCS)
 
-# builds the SWI-Prolog loadable module
-$(MODULE): $(OBJDIR) $(OBJS)
+# builds the executable
+$(MODULE): $(OBJDIR) $(SWI_OBJS)
 	@echo "Building module $(MODULE)"
-	@$(LINK) $(SWI_LDFLAGS) -o $(MODULE) $(OBJS) $(SWI_SRCS) $(SWI_LDLIBS)
-
-# builds the GNU Prolog library
-lib$(MODULE).a: $(OBJDIR) $(GP_OBJ)
+	$(LINK) $(SWI_LDFLAGS) -o $(MODULE) $(SWI_OBJS) $(SWI_LDFLAGS) $(SWI_LDLIBS)
+lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	@echo "Building library $(MODULE)"
-	$(AR) -r -c $@ $(GP_OBJ)
+	$(AR) -r -c $@ $(GP_OBJS)
 	$(RANLIB) $@
 
 clean:
@@ -83,3 +81,4 @@ clean:
 
 $(OBJDIR):
 	@mkdir $(OBJDIR)
+
