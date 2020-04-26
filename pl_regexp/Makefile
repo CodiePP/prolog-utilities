@@ -46,19 +46,19 @@ SWI_OBJS = $(OBJDIR)/swi-regexp.o
 # other implicit rules
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo "compiling $<"
-	@$(CC) -c $(SWI_CFLAGS) -o $@ $<
+	$(CC) -c $(SWI_CFLAGS) -o $@ $<
 
 $(OBJDIR)/%.gpo : $(SRCDIR)/%.pl
 	@echo "compiling $<"
-	@$(GPLC) -c -o $@ $<
+	$(GPLC) -c -o $@ $<
 
 $(OBJDIR)/%.gpo : $(SRCDIR)/%.c
 	@echo "compiling $<"
-	@$(GPLC) -c -o $@ $<
+	$(GPLC) -c -o $@ $<
 
 $(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
 	@echo "compiling $<"
-	$(SWIPL) -t "qcompile(\"$<\")."
+	$(SWIPL) -q -t "qcompile(\"$<\")."
 
 # rule to make it all
 all: $(MODULE) lib$(MODULE).a $(SRCDIR)/regexp.qlf

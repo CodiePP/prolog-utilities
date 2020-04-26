@@ -18,20 +18,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <stdlib.h>
 #include "gprolog.h"
 #include <regex.h>
 
 /* Prototypes */
 
 /* returns TRUE when matched */
-/* res is a list of the subexpressions that matched or an empty list */
+/* res is a list of the subexpressions that matched */
 PlBool pl_regexp(char *str, char *pattern, PlTerm p_res)
 {
-  PlTerm vals[1];
-  vals[0] = Pl_Mk_String(str);
-  return Pl_Un_Proper_List_Check(1, vals, p_res);
-}
-/*
   int sub_exp, reg_res;
   regex_t *reg_comp;
   regmatch_t *reg_matches;
@@ -97,4 +93,4 @@ PlBool pl_regexp(char *str, char *pattern, PlTerm p_res)
 
   regfree(reg_comp);
   return Pl_Un_Proper_List_Check(sub_exp, vals, p_res);
-  */
+}

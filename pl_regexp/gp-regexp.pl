@@ -21,8 +21,14 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- foreign(pl_regexp(+codes, +codes, term)).
+/*
+ *   build a new top level:
+ *
+ *   gplc -o test-gp --new-top-level gp-regexp.pl  libplregexp-Linux.a
+ */
 
-info_regexp :- write('Prolog Regexp Interface'),nl,
-                      %                                %
-               write('pl_regexp(Str, Regexp, Matches)  returns Matches if success'),nl.
+'$info_regexp' :- info_regexp.
+
+module(regexp, '$info_regexp', [
+		pl_regexp/3
+	]).
