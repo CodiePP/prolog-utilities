@@ -1,7 +1,7 @@
 Interface to the PostgreSQL Database Server from [GNU|SWI] Prolog
 =================================================================
 
-Copyright (C) 1999-2020  Alexander Diemand
+Copyright (C) 1999-2021  Alexander Diemand
 
 
 PREDICATES
@@ -56,7 +56,13 @@ EXAMPLES
 HOW TO COMPILE
 --------------
 
-edit the <ARCH>.def file (`uname -s` should give the actual architecture) 
+```sh
+aclocal --force && autoheader --force && autoconf --force
+```
+then run
+```sh
+./configure
+```
 then call `make`
 
 

@@ -7,7 +7,10 @@ stdenv.mkDerivation rec {
 
     # Customizable development requirements
     nativeBuildInputs = [
-        git
+        automake
+        autoconf
+        pkg-config
+        postgresql
         gcc
         gprolog
         swiProlog
@@ -15,6 +18,7 @@ stdenv.mkDerivation rec {
 
     buildInputs = [
         zlib
+        openssl
     ];
 
 }
