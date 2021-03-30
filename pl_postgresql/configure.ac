@@ -62,13 +62,29 @@ SWI_PLLIBDIR=$SWI_BASE/library
 fi
 
 if [[ $ARCH = "Darwin" ]]; then
-  if test -d /usr/local/opt/swi-prolog; then
+  SWI_BASE=/usr/local/opt/swi-prolog
+  if test -d "${SWI_BASE}"; then
     MACHINE=$(uname -m)
-    SWI_BASE=/usr/local/opt/swi-prolog
     SWI_CFLAGS="-I${SWI_BASE}/libexec/lib/swipl/include"
     SWI_LIBS="-L${SWI_BASE}/libexec/lib/swipl/lib/${MACHINE}-darwin -lswipl"
   else
     AC_MSG_FAILURE([cannot find SWI Prolog])
+  fi
+  LIBCRYPTO_BASE=/usr/local/opt/openssl
+  if test -d "${LIBCRYPTO_BASE}"; then
+    MACHINE=$(uname -m)
+    LIBCRYPTO_CFLAGS="-I${LIBCRYPTO_BASE}/include"
+    LIBCRYPTO_LIBS="-L${LIBCRYPTO_BASE}/lib -lpq"
+  else
+    AC_MSG_FAILURE([cannot find OpenSSL])
+  fi
+  LIBPQ_BASE=/usr/local/opt/libpq
+  if test -d "${LIBPQ_BASE}"; then
+    MACHINE=$(uname -m)
+    LIBPQ_CFLAGS="-I${LIBPQ_BASE}/include"
+    LIBPQ_LIBS="-L${LIBPQ_BASE}/lib -lpq"
+  else
+    AC_MSG_FAILURE([cannot find PostgreSQL])
   fi
 fi
 
