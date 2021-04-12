@@ -22,6 +22,10 @@ PREDICATES
     sends the query to the server. This predicate is backtrackable and succeeds
     for every row in the result set of the query.
 
+`pl_pgsql_query_all/3 (+connection,+query,-results)`
+    sends the query to the server. This predicate is deterministic and collects
+    all rows from the result set of the query.
+
 
 EXAMPLES
 --------

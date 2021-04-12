@@ -40,6 +40,7 @@ foreign_t swi_pgsql_connect1(term_t dbx);
 foreign_t swi_pgsql_connect2(term_t host, term_t port, term_t user, term_t passwd, term_t dbname, term_t dbx);
 foreign_t swi_pgsql_disconnect (term_t dbx);
 foreign_t swi_pgsql_query1 (term_t dbx, term_t query);
+foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t list);
 foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t handle);
 
 
@@ -58,6 +59,7 @@ install_t install()
 	PL_register_foreign("pl_pgsql_connect", 6, swi_pgsql_connect2, 0);
 	PL_register_foreign("pl_pgsql_disconnect", 1, swi_pgsql_disconnect, 0);
 	PL_register_foreign("pl_pgsql_query", 2, swi_pgsql_query1, 0);
+	PL_register_foreign("pl_pgsql_query_all", 3, swi_pgsql_query_all, 0);
 	PL_register_foreign("pl_pgsql_query", 3, swi_pgsql_query2, PL_FA_NONDETERMINISTIC);
 }
 
@@ -232,10 +234,10 @@ foreign_t swi_pgsql_disconnect (term_t dbx)
 
 foreign_t swi_pgsql_query1 (term_t dbx, term_t query)
 {
-        char	errmsg[1024];
-        PGresult *result;
-	char	*qstr;
-	unsigned long t_val;
+  char	errmsg[1024];
+  PGresult *result;
+  char	*qstr;
+  unsigned long t_val;
 
 	pq_connection_encoded *pgconn;
 
@@ -275,6 +277,100 @@ typedef struct {
 	PGresult *result;
 } pq_result_encoded;
 
+int unify_result_row(PGresult *result, int nfields, int idx, term_t out_row)
+{
+	term_t val = PL_new_term_ref();
+	term_t lst = PL_copy_term_ref(out_row);
+
+	/* copy single row to list */
+  int fnum;
+  for (fnum = 0; fnum < nfields; fnum++)
+  {
+    char *tchar;
+    tchar = PQgetvalue(result, idx, fnum);
+    PL_unify_list(lst, val, lst);
+    /* printf ("got: type %d  value %s\n", PQftype((*result),fnum), tchar);  */
+    switch (PQftype(result, fnum)) {
+        case INT2OID:
+        case INT4OID:
+        case OIDOID:
+                PL_unify_integer(val, strtol(tchar,NULL,10));
+                break;
+        case FLOAT4OID:
+        case FLOAT8OID:
+        case CASHOID:
+                PL_unify_float(val, strtod(tchar,NULL));
+                break;
+        default:
+                if (strncmp(tchar,"NULL",4) == 0) {
+                    PL_unify_nil(val);
+                } else {
+                    PL_unify_string_chars(val, tchar);
+                }
+                break;
+    } /* switch field type */
+  } /* for every field in the row */
+
+  return PL_unify_nil(lst);
+}
+
+foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res) 
+{
+  char errmsg[1024];
+
+  if (! PL_is_variable(out_res))
+  {
+    strncpy (errmsg, "PGSQL: last argument should be variable output!", 1023);
+    PLException(errmsg,"pl_pgsql_query/3");
+  }
+
+  /* fprintf(stderr, "Conn: %lx Query: %s\n", my_pgsql->value.l,query); */
+
+  PGresult *pqres;
+  char *qstr;
+
+  pq_connection_encoded *pgconn;
+
+  PL_get_pointer(dbx, &pgconn);
+  if (!pgconn || !pgconn->valid) { PL_fail; }
+
+  PL_get_chars(query, &qstr, CVT_ATOM | CVT_STRING);
+
+  /* send query and receive result */
+  pqres = PQexec (pgconn->dbx, qstr);
+  if ((PQresultStatus(pqres) != PGRES_COMMAND_OK) &&
+      (PQresultStatus(pqres) != PGRES_TUPLES_OK))
+  {
+
+    snprintf(errmsg, 1023, "PGSQL: %s -> %s", PQresStatus(PQresultStatus(pqres)), PQresultErrorMessage(pqres), 1023);
+    PQclear(pqres);
+    PLException(errmsg,"pl_pgsql_query_all/3");
+    PL_fail;
+  }
+
+  int nrows = PQntuples(pqres);
+  if (nrows <= 0) {
+    PQclear(pqres);
+    PL_fail;
+  }
+  int nfields = PQnfields(pqres);
+
+  fprintf(stderr, "Result rows: %d fields: %d\n", nrows, nfields);
+
+  term_t row = PL_new_term_ref();
+  term_t lst = PL_copy_term_ref(out_res);
+
+  int rowidx;
+  for (rowidx = 0; rowidx < nrows; rowidx++)
+  {
+    PL_unify_list(lst, row, lst);
+    unify_result_row(pqres, nfields, rowidx, row);
+  }
+
+  PQclear(pqres);
+  PL_succeed;
+}
+    
 
 foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t handle) 
 {

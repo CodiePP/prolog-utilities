@@ -28,6 +28,7 @@
                  , pl_pgsql_disconnect/1
                  , pl_pgsql_query/2
                  , pl_pgsql_query/3
+                 , pl_pgsql_query_all/3
                  ]).
 
 :- use_foreign_library(sbcl('plpgsql')).
