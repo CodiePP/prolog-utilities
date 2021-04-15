@@ -366,7 +366,7 @@ foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res)
   }
 
   PQclear(pqres);
-  PL_succeed;
+  return PL_unify_nil(lst);
 }
     
 
