@@ -55,7 +55,7 @@ PKG_PROG_PKG_CONFIG()
 
 if [[ $ARCH = "Darwin" ]]; then
   # you likely need to adjust these paths:
-  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/opt/homebrew/opt/swi-prolog/libexec/share/pkgconfig/:/opt/homebrew/opt/openssl@1.1/lib/pkgconfig:/opt/homebrew/opt/postgresql/lib/pkgconfig"
+  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${HOME}/.local/share/pkgconfig:/opt/homebrew/opt/openssl@1.1/lib/pkgconfig:/opt/homebrew/opt/postgresql/lib/pkgconfig"
 fi
 
 PKG_CHECK_MODULES([SWI], [swipl libssl libcrypto zlib libpq])

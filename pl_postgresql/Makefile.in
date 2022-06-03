@@ -17,7 +17,7 @@
 SWIPL = swipl
 GPLC = gplc
 
-LINK = @CXX@
+LINK = @CC@
 
 SWI_CFLAGS = @SWI_CFLAGS@ @LIBPQ_CFLAGS@ @LIBCRYPTO_CFLAGS@
 SWI_LDLIBS = @SWI_LIBS@ @LIBPQ_LIBS@ @LIBCRYPTO_LIBS@
@@ -26,6 +26,7 @@ GP_CFLAGS = @LIBPQ_CFLAGS@ @LIBCRYPTO_CFLAGS@
 GP_LDLIBS = @LIBPQ_LIBS@ @LIBCRYPTO_LIBS@
 
 # module name
+MNAME = @PACKAGE_NAME@
 MODULE = @PACKAGE_NAME@-@ARCH@
 
 SRCDIR = src
@@ -60,7 +61,7 @@ $(OBJDIR)/%.gpo : $(SRCDIR)/%.c
 
 $(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
 	@echo "compiling $<"
-	$(SWIPL) -q -t "qcompile(\"$<\")."
+	$(SWIPL) -q -t "asserta(file_search_path(sbcl,'.')), qcompile(\"$<\")."
 
 # rule to make it all
 all: $(MODULE) swi
@@ -74,6 +75,7 @@ $(GP_OBJS) : $(GP_SRCS)
 $(MODULE): $(OBJDIR) $(SWI_OBJS)
 	@echo "Building module $(MODULE)"
 	$(LINK) $(SWI_LDFLAGS) -o $(MODULE) $(SWI_OBJS) $(SWI_LDLIBS)
+	ln -sf $(MODULE) $(MNAME)
 lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	@echo "Building library $(MODULE)"
 	$(AR) -r -c $@ $(GP_OBJS)
