@@ -51,42 +51,19 @@ AC_SUBST(GI_DATADIR)
 AC_SUBST(SOTARGET)
 AC_SUBST(PLTARGET)
 
-if [[ $ARCH = "Linux" ]]; then
 PKG_PROG_PKG_CONFIG()
-PKG_CHECK_MODULES([SWI], [swipl libpq libcrypto zlib])
+
+if [[ $ARCH = "Darwin" ]]; then
+  # you likely need to adjust these paths:
+  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/opt/homebrew/opt/swi-prolog/libexec/share/pkgconfig/:/opt/homebrew/opt/openssl@1.1/lib/pkgconfig:/opt/homebrew/opt/postgresql/lib/pkgconfig"
+fi
+
+PKG_CHECK_MODULES([SWI], [swipl libssl libcrypto zlib libpq])
 
 SWI_BASE=$($PKG_CONFIG --variable=PLBASE swipl)
 SWI_ARCH=$($PKG_CONFIG --variable=PLARCH swipl)
 SWI_SOLIBDIR=$SWI_BASE/lib/$SWI_ARCH
 SWI_PLLIBDIR=$SWI_BASE/library
-fi
-
-if [[ $ARCH = "Darwin" ]]; then
-  SWI_BASE=/usr/local/opt/swi-prolog
-  if test -d "${SWI_BASE}"; then
-    MACHINE=$(uname -m)
-    SWI_CFLAGS="-I${SWI_BASE}/libexec/lib/swipl/include"
-    SWI_LIBS="-L${SWI_BASE}/libexec/lib/swipl/lib/${MACHINE}-darwin -lswipl"
-  else
-    AC_MSG_FAILURE([cannot find SWI Prolog])
-  fi
-  LIBCRYPTO_BASE=/usr/local/opt/openssl
-  if test -d "${LIBCRYPTO_BASE}"; then
-    MACHINE=$(uname -m)
-    LIBCRYPTO_CFLAGS="-I${LIBCRYPTO_BASE}/include"
-    LIBCRYPTO_LIBS="-L${LIBCRYPTO_BASE}/lib -lpq"
-  else
-    AC_MSG_FAILURE([cannot find OpenSSL])
-  fi
-  LIBPQ_BASE=/usr/local/opt/libpq
-  if test -d "${LIBPQ_BASE}"; then
-    MACHINE=$(uname -m)
-    LIBPQ_CFLAGS="-I${LIBPQ_BASE}/include"
-    LIBPQ_LIBS="-L${LIBPQ_BASE}/lib -lpq"
-  else
-    AC_MSG_FAILURE([cannot find PostgreSQL])
-  fi
-fi
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h])
