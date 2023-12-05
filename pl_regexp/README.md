@@ -4,6 +4,12 @@ Regular expressions in Prolog
 
 EXAMPLES
 --------
+
+load module:
+```
+use_module(sbcl(regexp)).
+```
+
 1) something that works:
 
 ```
@@ -42,7 +48,7 @@ GNU PROLOG top
 --------------
 
 ```
-gplc -o test-gp --new-top-level gp-regexp.pl  libplregexp-Linux.a
+gplc -o test-gp --new-top-level src/top-regexp.pl  libplregexp-Linux.a
 ```
 
 

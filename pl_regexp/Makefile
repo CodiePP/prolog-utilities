@@ -1,5 +1,5 @@
 #   Prolog Regexp Interface
-#   Copyright (C) 1999-2020  Alexander Diemand
+#   Copyright (C) 1999-2023  Alexander Diemand
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -73,6 +73,8 @@ lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	@echo "Building library $(MODULE)"
 	$(AR) -r -c $@ $(GP_OBJS)
 	$(RANLIB) $@
+top: $(SRCDIR)/top-regexp.pl lib$(MODULE).a
+	gplc -o $@ --new-top-level $(SRCDIR)/top-regexp.pl lib$(MODULE).a
 
 clean:
 	@echo "Cleaning away everything."

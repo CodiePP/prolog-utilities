@@ -1,5 +1,5 @@
 #   Prolog Regexp
-#   Copyright (C) 1999-2020  Alexander Diemand
+#   Copyright (C) 1999-2023  Alexander Diemand
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -41,13 +41,13 @@ RANLIB = ranlib
 
 # include path and library settings
 # add other include paths here, i.e. -I/usr/local/include
-SWI_ARCH_INC = -I${PLBASE}/include/ -I${HOME}/lib/include
+SWI_ARCH_INC = -I${PLBASE}/include/
 
 # add other linker flags here, i.e. -L/usr/local/lib
-SWI_ARCH_LDFLAGS = -shared
+SWI_ARCH_LDFLAGS = -L${PLLIBDIR} -shared
 
 # add other libraries here, i.e. -liostream
-SWI_ARCH_LIBS =
+SWI_ARCH_LIBS = ${PLLIB}
 
 # GNU Prolog: include path and library settings
 GP_ARCH_INC =
