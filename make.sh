@@ -8,6 +8,6 @@ export PLLIBDIR
 export PLLIB
 
 make -C pl_toolbox
+make -C pl_postgresql
 make -C pl_regexp
 make -C pl_cgi
-

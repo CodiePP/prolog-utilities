@@ -1,8 +1,6 @@
 Regular expressions in Prolog
 =============================
 
-Copyright (C) 1999-2020  Alexander Diemand
-
 
 EXAMPLES
 --------
@@ -50,6 +48,8 @@ gplc -o test-gp --new-top-level gp-regexp.pl  libplregexp-Linux.a
 
 LICENSE
 -------
+
+Copyright (C) 1999-2023  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

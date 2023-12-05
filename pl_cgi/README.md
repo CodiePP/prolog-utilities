@@ -1,9 +1,6 @@
 Prolog CGI programming
 ======================
 
-Copyright (C) 1999-2020  Alexander Diemand
-
-
 After `init_cgi` you can set the variable cgi_env(plContentType,'text/html'), 
 which controls what content type for the document is being used, to something
 different.
@@ -32,6 +29,8 @@ are available in the predicate:
 
 LICENSE
 -------
+
+Copyright (C) 1999-2023  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -6,7 +6,7 @@
 /* Descr.:                                                                 */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2020 Alexander Diemand                               */
+/* Copyright (C) 1999-2023 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -26,16 +26,18 @@
 :- include('string.pl').
 :- include('stream.pl').
 :- include('vector.pl').
+:- include('json.pl').
 
 pl_temporary_file(Dir,Prefix,Fpath) :- temporary_file(Dir,Prefix,Fpath).
 
-/*
 info_toolbox :-
         info_math,
         info_string,
         info_stream,
-        info_vector.
+        info_vector,
+		info_json.
 
+/*
 module(toolbox, info_toolbox, [
 	% math
 		pi/1, e/1, det/2, rad2grad/2, grad2rad/2,
@@ -58,9 +60,11 @@ module(toolbox, info_toolbox, [
 		skip/3,
 		align_left/3, align_right/3,
 		lower_case/2, upper_case/2,
-	%vector
+	% vector
 		vrand/2, vzero/2, vnorm/2,
 		vval/2, vsum/2, vadd/3, vsub/3, vmul/3, vdiv/3,
-		vdist/3, vscal/3, vprod/3, vmix/4
+		vdist/3, vscal/3, vprod/3, vmix/4,
+	% json
+		from_json/2
 	]).
 */

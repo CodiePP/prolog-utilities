@@ -1,8 +1,6 @@
 Interface to the PostgreSQL Database Server from [GNU|SWI] Prolog
 =================================================================
 
-Copyright (C) 1999-2021  Alexander Diemand
-
 
 PREDICATES
 ----------
@@ -30,6 +28,12 @@ PREDICATES
 EXAMPLES
 --------
 
+load module:
+```
+use_module(sbcl(pgsql)).
+```
+
+
 1) something that works:
 
 ```
@@ -47,7 +51,7 @@ EXAMPLES
      format("~d: ~s lives in ~s~n",Result),
      fail,  % to backtrack over next row in Result
 
-  run_query(DBx) :- pl_pgsql_disconnect(DBx).  % always succeed
+  run_query(_DBx).  % always succeed
 ```	
 
 ```
@@ -74,7 +78,7 @@ INSTALLATION
 ------------
 
 copy the plpgsql-<ARC> file to where your search path points to.
-I have added the following in the file ~/.swiplrc:
+I have added the following in the file ~/.config/swi-prolog/init.pl:
 
 > :- assertz(file_search_path(sbcl,'/home/<username>/lib/sbcl')). 
 
@@ -91,6 +95,8 @@ On the mips/IRIX there were quite a few problems with gprolog tagged integers. A
 
 LICENSE
 -------
+
+Copyright (C) 1999-2023  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

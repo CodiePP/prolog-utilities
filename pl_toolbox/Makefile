@@ -1,5 +1,5 @@
 #   Prolog Toolbox
-#   Copyright (C) 1999-2020  Alexander Diemand
+#   Copyright (C) 1999-2023  Alexander Diemand
 # 
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ MODULE = pltoolbox-$(ARCH)
 SRCDIR = src
 OBJDIR = obj-$(ARCH)
 
-GP_SRCS = $(SRCDIR)/math.pl $(SRCDIR)/gp-toolbox.pl $(SRCDIR)/math.pl $(SRCDIR)/stream.pl $(SRCDIR)/string.pl $(SRCDIR)/vector.pl
+PL_SRCS = $(SRCDIR)/math.pl $(SRCDIR)/stream.pl $(SRCDIR)/string.pl $(SRCDIR)/vector.pl $(SRCDIR)/json.pl
 GP_OBJS = $(OBJDIR)/gp-toolbox.gpo
 
 # object files
@@ -48,27 +48,33 @@ $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo "compiling $<"
 	$(CC) -c $(SWI_CFLAGS) -o $@ $<
 
-$(OBJDIR)/%.gpo : $(SRCDIR)/%.pl
+$(OBJDIR)/%.gpo : $(SRCDIR)/gp-toolbox.pl
 	@echo "compiling $<"
 	$(GPLC) -c -o $@ $<
 
-$(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
+$(SRCDIR)/%.qlf : $(SRCDIR)/toolbox.pl
 	@echo "compiling $<"
 	$(SWIPL) -q -t "qcompile(\"$<\")."
 
 # rule to make it all
 all: $(MODULE) lib$(MODULE).a $(SRCDIR)/toolbox.qlf
 
-$(GP_OBJS) : $(GP_SRCS)
+$(GP_OBJS): $(PL_SRCS)
+
+$(SRCDIR)/gp-toolbox.pl: $(PL_SRCS)
+$(SRCDIR)/toolbox.pl: $(PL_SRCS)
 
 # builds the executable
 $(MODULE): $(OBJDIR) $(SWI_OBJS)
 	@echo "Building module $(MODULE)"
+	eval $(swipl --dump-runtime-variables)
 	@$(LINK) $(SWI_LDFLAGS) -o $(MODULE) $(SWI_OBJS) $(SWI_LDLIBS)
 lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	@echo "Building library $(MODULE)"
 	$(AR) -r -c $@ $(GP_OBJS)
 	$(RANLIB) $@
+top: $(SRCDIR)/gp-toolbox.pl
+	gplc -o $@ --new-top-level $<
 
 clean:
 	@echo "Cleaning away everything."
