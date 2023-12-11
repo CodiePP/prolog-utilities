@@ -1,5 +1,6 @@
 
 *.qlf
+*.gpo
 *.o
 lib*.a
 

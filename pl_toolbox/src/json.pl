@@ -160,8 +160,8 @@ read_json_value4(Stream, 44, [LL, has_name(N), in_structure(S) | Acc], ValueOut)
         get_code(Stream, Char), !,
         read_json_value4(Stream, Char, [in_structure([N = LL | S]) | Acc], ValueOut).        
 
-read_json_value4(_Stream, 44, _Acc, _ValueOut) :-
-        !, format('encountered "," but could not add it. acc=~q~n',[_Acc]), fail.
+read_json_value4(_Stream, 44, Acc, _ValueOut) :-
+        !, format('encountered "," but could not add it. acc=~q~n',[Acc]), fail.
 
 % util
 read_txtwhile(Stream, Set, Acc, Result, OutCode) :-

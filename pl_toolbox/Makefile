@@ -35,7 +35,7 @@ MODULE = pltoolbox-$(ARCH)
 SRCDIR = src
 OBJDIR = obj-$(ARCH)
 
-PL_SRCS = $(SRCDIR)/math.pl $(SRCDIR)/stream.pl $(SRCDIR)/string.pl $(SRCDIR)/vector.pl $(SRCDIR)/json.pl
+PL_SRCS = $(SRCDIR)/math.pl $(SRCDIR)/stream.pl $(SRCDIR)/string.pl $(SRCDIR)/vector.pl $(SRCDIR)/json.pl $(SRCDIR)/gp-toolbox.pl
 GP_OBJS = $(OBJDIR)/gp-toolbox.gpo
 
 # object files
@@ -48,7 +48,7 @@ $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo "compiling $<"
 	$(CC) -c $(SWI_CFLAGS) -o $@ $<
 
-$(OBJDIR)/%.gpo : $(SRCDIR)/gp-toolbox.pl
+$(OBJDIR)/%.gpo : $(SRCDIR)/%.pl
 	@echo "compiling $<"
 	$(GPLC) -c -o $@ $<
 
@@ -61,7 +61,6 @@ all: $(MODULE) lib$(MODULE).a $(SRCDIR)/toolbox.qlf
 
 $(GP_OBJS): $(PL_SRCS)
 
-$(SRCDIR)/gp-toolbox.pl: $(PL_SRCS)
 $(SRCDIR)/toolbox.pl: $(PL_SRCS)
 
 # builds the executable
@@ -73,8 +72,8 @@ lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	@echo "Building library $(MODULE)"
 	$(AR) -r -c $@ $(GP_OBJS)
 	$(RANLIB) $@
-top: $(SRCDIR)/gp-toolbox.pl
-	gplc -o $@ --new-top-level $<
+top: $(SRCDIR)/top-toolbox.pl lib$(MODULE).a
+	gplc -o $@ --new-top-level $(SRCDIR)/top-toolbox.pl lib$(MODULE).a
 
 clean:
 	@echo "Cleaning away everything."
