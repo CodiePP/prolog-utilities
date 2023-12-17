@@ -1,5 +1,5 @@
 #   Prolog Regexp Interface
-#   Copyright (C) 1999-2020  Alexander Diemand
+#   Copyright (C) 1999-2023  Alexander Diemand
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -60,18 +60,16 @@ $(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
 	$(SWIPL) -q -t "qcompile(\"$<\")."
 
 # rule to make it all
-all: $(MODULE) lib$(MODULE).a $(SRCDIR)/cgi.qlf
+all: lib$(MODULE).a $(SRCDIR)/cgi.qlf
 
 $(GP_OBJS) : $(GP_SRCS)
 
-# builds the executable
-$(MODULE): $(OBJDIR) $(SWI_OBJS)
-	@echo "Building module $(MODULE)"
-	$(LINK) $(SWI_LDFLAGS) -o $(MODULE) $(SWI_OBJS) $(SWI_LDFLAGS) $(SWI_LDLIBS)
 lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	@echo "Building library $(MODULE)"
 	$(AR) -r -c $@ $(GP_OBJS)
 	$(RANLIB) $@
+top: $(SRCDIR)/top-cgi.pl lib$(MODULE).a
+	gplc -o $@ --new-top-level $(SRCDIR)/top-cgi.pl lib$(MODULE).a ../pl_regexp/libplregexp-$(ARCH).a ../pl_toolbox/libpltoolbox-$(ARCH).a
 
 clean:
 	@echo "Cleaning away everything."

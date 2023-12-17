@@ -6,7 +6,7 @@
 /* Descr.: Helps with reading and writing to/from CGI requests             */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2020 Alexander Diemand                               */
+/* Copyright (C) 1999-2023 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -31,4 +31,5 @@
 getenv(A,B) :- environ(A,B).
 access_file(F,P) :- file_permission(F,P).
 atom_to_term(A,T,_) :- read_term_from_atom(A,T,[]).
+open_string(String,Stream) :- open_input_atom_stream(String,Stream).
 

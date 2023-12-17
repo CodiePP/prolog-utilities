@@ -6,7 +6,7 @@
 /* Descr.: Helps with reading and writing to/from CGI requests             */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2020 Alexander Diemand                               */
+/* Copyright (C) 1999-2023 Alexander Diemand                               */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -22,11 +22,6 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-/*
-:- dynamic(cgi_env/2).        % where we store the environment
-:- dynamic(cgi_in/2).         % keeps the content of the cgi variables
-:- dynamic(cgi_cookies/2).    % keeps the content of the cookies
-*/
 
 info_cgi :- 
         write('Prolog CGI, CGI handling'),nl,
@@ -43,7 +38,7 @@ init_cgi :-
         current_input(DefInp),
         ( getenv('REQUEST_METHOD','GET'),getenv('QUERY_STRING',Query), Query \== '' ->
             % method GET in environment variable QUERY_STRING
-            open_input_atom_stream(Query,Str), % load from environment variable
+            open_string(Query,Str), % load from environment variable
             %atom_concat('echo "',Query, Cmd1),
             %atom_concat(Cmd1,'"',Cmd),
             %open(pipe(Cmd), read, Str, []),

@@ -4,7 +4,7 @@
 eval $(swipl --dump-runtime-variables)
 
 export PLBASE
-export PLLIB
 export PLLIBDIR
+export PLLIB
 
 make

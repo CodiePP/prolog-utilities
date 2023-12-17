@@ -38,4 +38,6 @@
 
 pl_regexp(A,B,C) :- regexp:pl_regexp(A,B,C).
 
+open_atom_input_stream(A,S) :- open_string(A,S).
+
 :- include('common.pl').

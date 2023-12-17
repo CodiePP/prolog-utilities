@@ -3,4 +3,4 @@
 *.gpo
 *.o
 lib*.a
-
+.vscode/

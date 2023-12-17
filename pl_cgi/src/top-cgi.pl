@@ -1,8 +1,9 @@
 /*-------------------------------------------------------------------------*/
-/* Prolog Regexp Interface                                                 */
+/* Prolog CGI handling                                                     */
 /*                                                                         */
-/* File  : pl_regexp.pl                                                    */
-/* Descr.:                                                                 */
+/* Part  : CGI Handling                                                    */
+/* File  : top-cgi.pl                                                      */
+/* Descr.: top REPL entry point                                            */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
 /* Copyright (C) 1999-2023 Alexander Diemand                               */
@@ -21,9 +22,17 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
+/*
+ *   build a new top level:
+ *
+ *   gplc -o top --new-top-level src/top-cgi.pl libplcgi-${ARCH}.a
+ */
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
+ '$info_cgi' :- info_cgi.
 
-:- initialization(regexp:init).
+ module(cgi, '$info_cgi', [
+     init_cgi/0,
+     generate_html_output/1,
+     generate_html_output/2
+     ]).
+ 

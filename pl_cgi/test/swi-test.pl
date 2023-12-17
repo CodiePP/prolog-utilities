@@ -1,8 +1,6 @@
-% extends SWI-Prolog's search path:
-:- assertz(file_search_path(sbcl,'/home/axeld/lib/sbcl')).
+:- use_module(sbcl(cgi)).
 
 run :-
-	use_module(sbcl(cgi)),
 	init_cgi,
 	asserta(cgi:cgi_env(plPragma,'Cacheable')),
 	template(Tf),
@@ -10,4 +8,3 @@ run :-
 	halt.
 
 template('test101.0').
-
