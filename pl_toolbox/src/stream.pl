@@ -91,12 +91,16 @@ read_txtuntil(Sep,String) :-
 
 read_txtuntil(Stream,Sep,String) :- 
         get_code(Stream,Char),
-        '$read_txtuntil_aux'(Stream,Char,Sep,String).
+        '$read_txtuntil_aux'(Stream,0,Char,Sep,[],String).
 
-'$read_txtuntil_aux'(_,-1,_,[]) :- !.   % end of file
-'$read_txtuntil_aux'(_,C,C,[]) :- !.
-'$read_txtuntil_aux'(Stream,C,S,[C|Rest]) :- 
-        read_txtuntil(Stream,S,Rest).
+'$read_txtuntil_aux'(_Stream,_Prev,-1,_Sep,Acc,String) :- % end of file
+        reverse(Acc,String), !.
+'$read_txtuntil_aux'(_Stream,Prev,C,C,Acc,String) :- % match
+        Prev \= 92,  % previous char is not '\\'
+        reverse(Acc,String), !.
+'$read_txtuntil_aux'(Stream,_Prev,C,Sep,Acc,String) :-
+        get_code(Stream,Char),
+        '$read_txtuntil_aux'(Stream,C,Char,Sep,[C | Acc],String).
 
 info_read_txtuntil :- 
         %      ^                                ^
