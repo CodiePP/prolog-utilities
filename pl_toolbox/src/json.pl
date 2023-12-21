@@ -22,14 +22,14 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-info_json :- 
+info_json :-
         write('Prolog Toolbox, JSON processing'),nl,
         info_from_json.
 
 
 % Reads in a JSON structure
 
-info_from_json :- 
+info_from_json :-
         %      ^                                ^
         write('from_json(Stream,Json)           reads from Stream and returns the structure'),nl,
         write('json_print(Json)                 prints the Json structure to the current stream'),nl.
@@ -115,6 +115,10 @@ read_json_value4(Stream, 125, [Name = Value, in_structure(S), has_name(Sname) | 
         (S = [] -> Structure = [Name = Value]; reverse([(Name = Value) | S], Structure)),
         !, read_json_value4(Stream, Char, [Sname = has_value(structure,Structure) | Acc], ValueOut).
 
+read_json_value4(Stream, 125, [in_structure([]), has_name(Sname) | Acc], ValueOut) :-
+        get_code(Stream, Char), %format(" \\}3 has ~p + ~p~n",[Value, S]),
+        !, read_json_value4(Stream, Char, [Sname = has_value(structure,[]) | Acc], ValueOut).
+
 read_json_value4(Stream, 125, [Name = Value, in_structure(S) | Acc], ValueOut) :-
         get_code(Stream, Char), %format(" \\}3 has ~p + ~p~n",[Value, S]),
         (S = [] -> Structure = [Name = Value]; reverse([(Name = Value) | S], Structure)),
@@ -144,8 +148,13 @@ read_json_value4(Stream, 93, [LL, in_list(S) | Acc], ValueOut) :-
         reverse([LL | S], List), !,
         read_json_value4(Stream, Char, [has_value(list, List) | Acc], ValueOut).
 
-read_json_value4(_Stream, 93, _Acc, _ValueOut) :-
-        !, write('encountered "]" but no start of list previously.~n'), fail.
+read_json_value4(Stream, 93, [in_list(S) | Acc], ValueOut) :-
+        get_code(Stream, Char),
+        reverse(S, List), !,
+        read_json_value4(Stream, Char, [has_value(list, List) | Acc], ValueOut).
+
+read_json_value4(_Stream, 93, Acc, _ValueOut) :-
+        !, format('encountered "]" but no start of list previously. acc=~q~n',[Acc]), fail.
 
 % "," - commit value
 read_json_value4(Stream, 44, [LL, in_list(S) | Acc], ValueOut) :-
@@ -154,19 +163,25 @@ read_json_value4(Stream, 44, [LL, in_list(S) | Acc], ValueOut) :-
 
 read_json_value4(Stream, 44, [N=has_value(Ty,Val), in_structure(S) | Acc], ValueOut) :-
         get_code(Stream, Char), !,
-        read_json_value4(Stream, Char, [in_structure([N=has_value(Ty,Val) | S]) | Acc], ValueOut).        
+        read_json_value4(Stream, Char, [in_structure([N=has_value(Ty,Val) | S]) | Acc], ValueOut).
 
 read_json_value4(Stream, 44, [LL, has_name(N), in_structure(S) | Acc], ValueOut) :-
         get_code(Stream, Char), !,
-        read_json_value4(Stream, Char, [in_structure([N = LL | S]) | Acc], ValueOut).        
+        read_json_value4(Stream, Char, [in_structure([N = LL | S]) | Acc], ValueOut).
 
 read_json_value4(_Stream, 44, Acc, _ValueOut) :-
         !, format('encountered "," but could not add it. acc=~q~n',[Acc]), fail.
 
+% ignore other characters - for debugging
+%read_json_value4(Stream, Char, Acc, ValueOut) :-
+%        format("  !!! unmatched char: ~d  acc=~q~n", [Char, Acc]),
+%        get_code(Stream, NextChar),
+%        !, read_json_value4(Stream, NextChar, Acc, ValueOut).
+
 % util
 read_txtwhile(Stream, Set, Acc, Result, OutCode) :-
         get_code(Stream, Char),
-        ( member(Char, Set) -> 
+        ( member(Char, Set) ->
                 !, read_txtwhile(Stream, Set, [Char | Acc], Result, OutCode)
         ;
                 reverse(Acc, Result), OutCode = Char).
@@ -231,7 +246,7 @@ json_print2(X, _Indent) :-
 json_print2(X, _Indent) :-
         list(X), !,
         format("\"~s\"",[X]).
-        
+
 indent(0) :- !.
 indent(Indent) :-
         put_char(' '),
