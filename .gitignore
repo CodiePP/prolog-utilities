@@ -4,3 +4,8 @@
 *.o
 lib*.a
 .vscode/
+top
+obj-*
+*-Darwin
+*-Linux
+*.local

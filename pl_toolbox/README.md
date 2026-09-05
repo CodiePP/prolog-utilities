@@ -37,14 +37,14 @@ GNU PROLOG top
 --------------
 
 ```
-gplc -o gp-toolbox --new-top-level gp-test.pl libpltoolbox-Linux.a
+gplc -o gp-toolbox --new-top-level gp-test.pl libpltoolbox-$(uname -s).a
 ```
 
 
 LICENSE
 -------
 
-Copyright (C) 1999-2023  Alexander Diemand
+Copyright (C) 1999-2026  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -57,6 +57,6 @@ module(toolbox, info_toolbox, [
 		vval/2, vsum/2, vadd/3, vsub/3, vmul/3, vdiv/3,
 		vdist/3, vscal/3, vprod/3, vmix/4,
 	% json
-		from_json/2, json_print/1
+		from_json/2, to_json/2, json_print/1, json_from_file/2
 	]).
 
