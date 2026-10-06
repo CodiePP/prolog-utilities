@@ -41,6 +41,8 @@ GP_OBJS = $(OBJDIR)/gp-toolbox.gpo
 # object files
 SWI_OBJS = $(OBJDIR)/lowlevelroutines.o
 
+.PHONY: check clean
+
 .SUFFIXES: .c
 
 # other implicit rules
@@ -74,6 +76,12 @@ lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
 	$(RANLIB) $@
 top: $(SRCDIR)/top-toolbox.pl lib$(MODULE).a
 	gplc -o $@ --new-top-level $(SRCDIR)/top-toolbox.pl lib$(MODULE).a
+
+# JSON tests, GNU Prolog (and SWI-Prolog if installed)
+check: $(OBJDIR)
+	$(GPLC) --no-top-level -o $(OBJDIR)/test_json test/test_json.pl $(SRCDIR)/json.pl
+	$(OBJDIR)/test_json
+	if command -v $(SWIPL) >/dev/null; then $(SWIPL) -q $(SRCDIR)/json.pl test/test_json.pl; fi
 
 clean:
 	@echo "Cleaning away everything."

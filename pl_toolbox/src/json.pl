@@ -7,7 +7,7 @@
 /*         Objects  <-> json([Name=Value, ...])                            */
 /*         Arrays   <-> [Value, ...]                                       */
 /*         Strings  <-> atom                                               */
-/*         Numbers  <-> number                                             */
+/*         Numbers  <-> number (atom of its digits if out of range)        */
 /*         true/false/null <-> the atoms true/false/null                   */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
@@ -121,12 +121,40 @@ elements([V|Rest]) --> value(V), ws, ",", ws, elements(Rest).
 
 jstring(Codes) --> "\"", jchars(Codes), "\"".
 
-jchars([C|Cs]) --> jchar(C), !, jchars(Cs).
+% jchar(-Codes, ?Tail): one character of a string, as a difference list
+% (a \u escape may expand to several bytes, see code_point/3)
+jchars(Codes) --> jchar(Codes, Tail), !, jchars(Tail).
 jchars([]) --> [].
 
-jchar(Code) --> [0'\\], [0'u], !, hex4(Code).
-jchar(Code) --> [0'\\], [Esc], !, { unescape(Esc, Code) }.
-jchar(Code) --> [Code], { Code \== 0'", Code \== 0'\\ }.
+jchar(Codes, Tail) -->
+        [0'\\], [0'u], hex4(Hi), { Hi >= 0xD800, Hi =< 0xDBFF },
+        [0'\\], [0'u], hex4(Lo), { Lo >= 0xDC00, Lo =< 0xDFFF }, !,
+        { CP is 0x10000 + (Hi - 0xD800) * 1024 + (Lo - 0xDC00),
+          code_point(CP, Codes, Tail) }.
+jchar(Codes, Tail) --> [0'\\], [0'u], !, hex4(CP), { code_point(CP, Codes, Tail) }.
+jchar([Code|Tail], Tail) --> [0'\\], [Esc], !, { unescape(Esc, Code) }.
+jchar([Code|Tail], Tail) --> [Code], { Code \== 0'", Code \== 0'\\ }.
+
+% code_point(+CP, -Codes, ?Tail)
+%   where atoms hold Unicode characters (SWI-Prolog) the code point is
+%   kept as is; where atoms are byte strings (GNU Prolog) it is encoded
+%   as UTF-8, matching how unescaped non-ASCII text arrives there.
+code_point(CP, [CP|Tail], Tail) :- CP < 0x80, !.
+code_point(CP, [CP|Tail], Tail) :- wide_atoms, !.
+code_point(CP, [B1,B2|Tail], Tail) :- CP < 0x800, !,
+        B1 is 0xC0 \/ (CP >> 6),
+        B2 is 0x80 \/ (CP /\ 0x3F).
+code_point(CP, [B1,B2,B3|Tail], Tail) :- CP < 0x10000, !,
+        B1 is 0xE0 \/ (CP >> 12),
+        B2 is 0x80 \/ ((CP >> 6) /\ 0x3F),
+        B3 is 0x80 \/ (CP /\ 0x3F).
+code_point(CP, [B1,B2,B3,B4|Tail], Tail) :-
+        B1 is 0xF0 \/ (CP >> 18),
+        B2 is 0x80 \/ ((CP >> 12) /\ 0x3F),
+        B3 is 0x80 \/ ((CP >> 6) /\ 0x3F),
+        B4 is 0x80 \/ (CP /\ 0x3F).
+
+wide_atoms :- catch(atom_codes(_, [0x100]), _, fail).
 
 unescape(0'", 0'") :- !.
 unescape(0'\\, 0'\\) :- !.
@@ -148,7 +176,19 @@ hexval(C,V) :- C >= 0'A, C =< 0'F, !, V is C - 0'A + 10.
 
 number_val(N) -->
         int_part(P1), frac_part(P2), exp_part(P3),
-        { append(P1, P2, T), append(T, P3, Codes), number_codes(N, Codes) }.
+        { iso_frac(P2, P3, F),
+          append(P1, F, T), append(T, P3, Codes), number_from_codes(Codes, N) }.
+
+% ISO Prolog (GNU) needs a fraction before the exponent: 1e2 -> 1.0e2
+iso_frac([], [_|_], ".0") :- !.
+iso_frac(F, _, F).
+
+% a number out of range for this Prolog (e.g. integers beyond
+% max_integer in GNU Prolog) is returned as an atom of its digits
+number_from_codes(Codes, N) :-
+        catch(number_codes(N, Codes), error(_, _), fail), !.
+number_from_codes(Codes, A) :-
+        atom_codes(A, Codes).
 
 int_part(Codes) --> minus(M), digits1(D), { append(M, D, Codes) }.
 
@@ -230,7 +270,14 @@ escape_char(0'\\, [0'\\,0'\\]) :- !.
 escape_char(10, [0'\\,0'n]) :- !.
 escape_char(13, [0'\\,0'r]) :- !.
 escape_char(9, [0'\\,0't]) :- !.
+escape_char(8, [0'\\,0'b]) :- !.
+escape_char(12, [0'\\,0'f]) :- !.
+escape_char(C, [0'\\,0'u,0'0,0'0,H1,H2]) :- C < 32, !,
+        hexdigit(C >> 4, H1),
+        hexdigit(C /\ 15, H2).
 escape_char(C, [C]).
+
+hexdigit(Expr, D) :- V is Expr, ( V < 10 -> D is 0'0 + V ; D is 0'a + V - 10 ).
 
 /* -------------------------------------------------------------------- */
 /* pretty print                                                          */
