@@ -1,0 +1,28 @@
+# Build every module and run the unit tests (pl_*/test/*.plt, except it_*.plt).
+# Runs in the shared image from the CI_IMAGE repository variable (see image.yaml).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: nixos-amd64
+    container:
+      image: ${{ vars.CI_IMAGE }}
+      credentials:
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_TOKEN }}
+    steps:
+      - name: Check out repository code
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Build
+        run: ci/build.sh
+
+      - name: Unit tests
+        run: ci/test.sh

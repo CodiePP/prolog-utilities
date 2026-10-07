@@ -1,0 +1,76 @@
+# Builds and pushes the image that ci.yaml and it.yaml run in.
+#
+# Setup (once):
+#   - repository variable CI_IMAGE   e.g. forge.example.org/owner/prolog-utilities-ci:latest
+#   - repository secrets REGISTRY_USER and REGISTRY_TOKEN (token with package:write)
+#   - a runner with the label "docker-build" that has docker, git and node
+#     (e.g. registered as `docker-build:host`), because the job calls the
+#     docker CLI; a job container would need the docker socket mounted.
+# Until the image exists, build it by hand: ci/build-image.sh "$CI_IMAGE" --push
+name: image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .forgejo/images/**
+      - ci/build-image.sh
+      - .forgejo/workflows/image.yaml
+  workflow_dispatch:
+
+jobs:
+  image:
+    runs-on: nixos-amd64
+    container:
+      image: ${{ vars.CI_IMAGE }}
+      credentials:
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_TOKEN }}
+    steps:
+      - name: Check out repository code
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Log in to the registry
+        env:
+          CI_IMAGE: ${{ vars.CI_IMAGE }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: echo "$REGISTRY_TOKEN" | docker login "${CI_IMAGE%%/*}" -u "$REGISTRY_USER" --password-stdin
+
+      - name: discover and wait for docker daemon
+        run: |
+          GW_HEX=$(awk '$2 == "00000000" {print $3}' /proc/net/route | head -1)
+          GW_IP=$(printf '%d.%d.%d.%d' 0x${GW_HEX:6:2} 0x${GW_HEX:4:2} 0x${GW_HEX:2:2} 0x${GW_HEX:0:2})
+          echo "gateway IP: ${GW_IP}"
+          echo "DOCKER_HOST=tcp://${GW_IP}:2375" >> "$GITHUB_ENV"
+          export DOCKER_HOST="tcp://${GW_IP}:2375"
+          # our own container's ID (as seen by the dind engine) --
+          # sibling containers we docker-run below get attached to this
+          # container's network namespace with --network container:$ID
+          # so their published ports become reachable via plain
+          # "localhost" from here, matching what test/t1-3.pl expect.
+          echo "JOB_CONTAINER_ID=$(hostname)" >> "$GITHUB_ENV"
+          echo "job container id: $(hostname)"
+          for i in $(seq 1 20); do
+            if docker version >/dev/null 2>&1; then
+              echo "docker reachable via ${DOCKER_HOST} (try $i)"
+              exit 0
+            fi
+            echo "docker daemon not reachable yet (try $i)..."; sleep 3
+          done
+          echo "--- diagnostics ---"
+          echo "gateway: ${GW_IP}"
+          echo "nc -zv ${GW_IP} 2375:"; nc -zv "${GW_IP}" 2375 || true
+          echo "/proc/net/route:"; cat /proc/net/route || true
+          echo "docker version, full error:"; docker version || true
+          echo "docker daemon never became reachable"; exit 1
+          
+      - name: Set up Docker Buildx
+        run: docker buildx create --name multiarch-builder --driver docker-container --use && docker buildx inspect --bootstrap
+
+      - name: Build and push
+        env:
+          CI_IMAGE: ${{ vars.CI_IMAGE }}
+        run: docker buildx build --platform linux/amd64,linux/arm64 -t "$CI_IMAGE" -f .forgejo/images/ci/Dockerfile .forgejo/images/ci --push

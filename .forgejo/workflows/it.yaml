@@ -1,0 +1,61 @@
+# Integration tests: pl_curl against a small SWI-Prolog HTTP server, and the
+# PostgreSQL bridge against a PostgreSQL service container.
+# Runs in the shared image from the CI_IMAGE repository variable (see image.yaml).
+name: it
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  curl:
+    runs-on: nixos-amd64
+    container:
+      image: ${{ vars.CI_IMAGE }}
+      credentials:
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_TOKEN }}
+    steps:
+      - name: Check out repository code
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          submodules: false
+      - name: Build
+        run: ci/build.sh
+      - name: pl_curl against the Prolog fixture server
+        run: ci/it-curl.sh
+
+  postgres:
+    runs-on: docker
+    container:
+      image: ${{ vars.CI_IMAGE }}
+      credentials:
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_TOKEN }}
+    # the service is started with docker by the runner; from the job container
+    # it is reachable under its service name
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: plu
+          POSTGRES_PASSWORD: plu
+          POSTGRES_DB: plu
+        options: >-
+          --health-cmd "pg_isready -U plu -d plu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: plu
+      PGPASSWORD: plu
+      PGDATABASE: plu
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ci/build.sh
+      - name: pl_postgresql against the PostgreSQL service
+        run: ci/it-pgsql.sh

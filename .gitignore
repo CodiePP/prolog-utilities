@@ -9,3 +9,7 @@ obj-*
 *-Darwin
 *-Linux
 *.local
+
+# build output
+build/
+pl_postgresql/plpgsql

@@ -1,0 +1,72 @@
+% Small HTTP server used by the pl_curl integration tests (SWI-Prolog only).
+%
+%   swipl pl_curl/test/http_fixture.pl [Port]        (default port 18080)
+%
+% Endpoints:
+%   /get?...        200, JSON {"args": {...}, "headers": {...}} echoing what was received
+%                   (header names lower-case, '-' replaced by '_')
+%   /status/N       answers with status N and an empty text body
+%   /redirect       303 to /get
+%   /slow           answers after 5 seconds (timeout tests)
+%   /utf8           text/plain; charset=UTF-8 body "Gr\u00FC\u00DFe" followed by U+1F600 (smiley)
+
+:- encoding(utf8).
+
+:- use_module(library(http/thread_httpd)).
+:- use_module(library(http/http_dispatch)).
+:- use_module(library(http/http_json)).
+:- use_module(library(http/http_header)).
+
+:- http_handler(root(get),      handle_get,      []).
+:- http_handler(root(status),   handle_status,   [prefix]).
+:- http_handler(root(redirect), handle_redirect, []).
+:- http_handler(root(slow),     handle_slow,     []).
+:- http_handler(root(utf8),     handle_utf8,     []).
+
+handle_get(Request) :-
+    ( memberchk(search(Search), Request) -> true ; Search = [] ),
+    findall(N-V, member(N=V, Search), ArgPairs),
+    dict_pairs(Args, _, ArgPairs),
+    findall(Name-Value,
+            ( member(Header, Request),
+              Header =.. [Name, Value],
+              request_header(Name),
+              atomic(Value) ),
+            HeaderPairs),
+    dict_pairs(Headers, _, HeaderPairs),
+    reply_json_dict(_{args: Args, headers: Headers}).
+
+request_header(host).
+request_header(user_agent).
+request_header(accept).
+request_header(authorization).
+request_header(x_test).
+request_header(x_other).
+
+handle_status(Request) :-
+    memberchk(path_info(Path), Request),
+    atom_concat('/', CodeAtom, Path),
+    atom_number(CodeAtom, Code),
+    format('Status: ~d~n', [Code]),
+    format('Content-type: text/plain~n~n').
+
+handle_redirect(Request) :-
+    http_redirect(see_other, root(get), Request).
+
+handle_slow(_Request) :-
+    sleep(5),
+    format('Content-type: text/plain~n~n'),
+    format('late~n').
+
+handle_utf8(_Request) :-
+    format('Content-type: text/plain; charset=UTF-8~n~n'),
+    format('Gr~c~ce ~c', [252, 223, 128512]).
+
+main :-
+    current_prolog_flag(argv, Argv),
+    ( Argv = [PortAtom|_], atom_number(PortAtom, Port) -> true ; Port = 18080 ),
+    http_server(http_dispatch, [port(Port)]),
+    format(user_error, 'http_fixture listening on ~w~n', [Port]),
+    thread_get_message(_).     % block forever; the caller kills the process
+
+:- initialization(main, main).
