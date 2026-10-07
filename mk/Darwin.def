@@ -1,5 +1,5 @@
-#   Prolog Regexp
-#   Copyright (C) 1999-2023  Alexander Diemand
+#   Prolog utilities -- platform settings for macOS (see mk/common.mk)
+#   Copyright (C) 1999-2026  Alexander Diemand
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -13,43 +13,20 @@
 #
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
-# Platform dependent settings to Makefile
-
-# C/C++ compiler and flags
 CC = gcc
-OPT = -O1 #-O3 -pipe -fomit-frame-pointer
+OPT = -O2
 DEF = -D$(ARCH) -mmacosx-version-min=10.10
 DEBUG = -g
-WARN = -Wall
+WARN = -Wall -Wextra -Wformat=2 -Wno-unused-parameter
 PIC = -fPIC
-
-# GNU Prolog compiler
+# undefine first: some distributions already set _FORTIFY_SOURCE
+FORTIFY = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+HARDEN = -fstack-protector-strong
+# RELRO and BIND_NOW (-z relro, -z now) are ELF linker options; none for Mach-O
+HARDEN_LDFLAGS =
 GPLC = gplc
-
-# SWI-Prolog compiler
 SWIPL = swipl
-
-# linker for object files
-LINK = gcc
-
-# static library
+LINK = $(CC)
 AR = ar
-ARFLAGS = -ruv
 RANLIB = ranlib
-
-# include path and library settings
-# add other include paths here, i.e. -I/usr/local/include
-SWI_ARCH_INC = -I${PLBASE}/include
-
-# add other linker flags here, i.e. -L/usr/local/lib
-SWI_ARCH_LDFLAGS = -L${PLLIBDIR} -shared
-
-# add other libraries here, i.e. -liostream
-SWI_ARCH_LIBS = ${PLLIB}
-
-# GNU Prolog: include path and library settings
-GP_ARCH_INC = 
-GP_ARCH_LDFLAGS =
-GP_ARCH_LIBS =

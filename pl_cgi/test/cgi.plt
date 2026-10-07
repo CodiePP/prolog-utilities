@@ -88,6 +88,15 @@ test(post_without_length_too_long, [throws(error(resource_error(cgi_input_length
     setenv('REQUEST_METHOD', 'POST'),
     setup_call_cleanup(open_string("a=123456", In), with_input(In, cgi:init_cgi), close(In)).
 
+test(cookies, [cleanup(reset)]) :-
+    reset,
+    setenv('HTTP_COOKIE', 'a=1; b=2'),
+    setenv('REQUEST_METHOD', 'GET'),
+    setenv('QUERY_STRING', ''),
+    cgi:init_cgi,
+    findall(K=V, cgi:cgi_cookies(K, V), Cs),
+    msort(Cs, [a='1', b='2']).
+
 :- end_tests(cgi_input).
 
 :- begin_tests(cgi_output).

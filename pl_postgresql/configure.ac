@@ -14,8 +14,9 @@ AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_HEADERS([src/config.h])
 
 # preset definitions
+# same warnings and hardening as mk/*.def
 if test -z "$CFLAGS"; then
-  CFLAGS="-g -O2 -fPIC -Wall"
+  CFLAGS="-g -O2 -fPIC -Wall -Wextra -Wformat=2 -Wno-unused-parameter -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fstack-protector-strong"
 fi
 
 if test -z "$CXXFLAGS"; then
@@ -23,6 +24,13 @@ if test -z "$CXXFLAGS"; then
 fi
 
 ARCH=$(uname -s)
+
+# RELRO/BIND_NOW for ELF; no equivalent on macOS
+case "$ARCH" in
+  Darwin) HARDEN_LDFLAGS="" ;;
+  *)      HARDEN_LDFLAGS="-Wl,-z,relro,-z,now" ;;
+esac
+AC_SUBST(HARDEN_LDFLAGS)
 
 # Checks for programs.
 AC_PROG_CXX

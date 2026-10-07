@@ -23,13 +23,49 @@ does not forward a `bearer_auth` token to another host on a redirect.
 `nix-shell` (see [shell.nix](shell.nix), pinned nixpkgs) provides all of them.
 
 
+Building
+--------
+
+```sh
+./make.sh                       # all modules, stops at the first failure
+./make.sh pl_toolbox pl_curl    # only some
+make -C pl_regexp               # a single module (pl_postgresql: see its README)
+```
+
+`ci/build.sh` and `ci/test.sh` build everything into `build/stage` and run the
+unit tests, as the CI does.
+
+Compiler and linker flags live in [mk/Linux.def](mk/Linux.def) and
+[mk/Darwin.def](mk/Darwin.def), the rules in [mk/common.mk](mk/common.mk),
+shared by all module Makefiles. The C code is built with `-Wall -Wextra
+-Wformat=2`, `_FORTIFY_SOURCE=2`, `-fstack-protector-strong` and, on Linux,
+full RELRO (`-z relro -z now`).
+
+`make asan` (in a module directory) rebuilds that module's libraries with
+AddressSanitizer and UndefinedBehaviorSanitizer. `swipl` itself is not
+instrumented, so the runtime must be preloaded; leak detection does not work
+with `swipl` and must be off:
+
+```sh
+# Linux (gcc)
+LD_PRELOAD="$(gcc -print-file-name=libasan.so) $(gcc -print-file-name=libubsan.so)" \
+ASAN_OPTIONS=detect_leaks=0 swipl ...
+# macOS (clang); an AddressSanitizer "failed to deallocate" message when
+# swipl exits can be ignored
+DYLD_INSERT_LIBRARIES="$(cc -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" \
+ASAN_OPTIONS=detect_leaks=0 swipl ...
+```
+
+Run `make clean all` afterwards to get the normal build back.
+
+
 [pl_toolbox](pl_toolbox)
 ----------
 
 ```
  ?- toolbox:info_math.
 Prolog Toolbox, Mathematical Functors
-pi(X)                       X is 3.14169....
+pi(X)                       X is 3.14159....
 e(X)                        X is 2.71828....
 det([[X1,X2][Y1,Y2]],D)     D is the determinant
 rad2grad(R,G)               G=R/180*PI

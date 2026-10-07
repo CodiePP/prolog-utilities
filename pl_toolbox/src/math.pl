@@ -31,7 +31,7 @@ info_math :- write('Prolog Toolbox, Mathematical Functors'),nl,
 % Constants
 
                             %                           %
-info_math_const_1 :- write('pi(X)                       X is 3.14169....'),nl,
+info_math_const_1 :- write('pi(X)                       X is 3.14159....'),nl,
                      write('e(X)                        X is 2.71828....'),nl.
 
 pi(3.14159265358979323846).

@@ -136,12 +136,8 @@ read_cookies_aux(String) :-
         read_cookies_aux2(Match).
 
 read_cookies_aux2([]) :- !.
-read_cookies_aux2([_,B,C0,D0|_]) :-
+read_cookies_aux2([_,B,C,D|_]) :-   % pl_regexp/3 returns atoms
         %write(C),write('-->'),write(D),nl,
-        %string_to_atom(C0,C),
-        %string_to_atom(D0,D),
-        atom_codes(C,C0),
-        atom_codes(D,D0),
         X =.. ['cgi_cookies',C,D],
         asserta(X),
         read_cookies_aux(B).

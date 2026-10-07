@@ -26,7 +26,7 @@ echo "::: building pl_postgresql"
     # also installs current config/install-sh, config.guess, config.sub
     autoreconf -fi
     ./configure
-    make SWIPL="$SWIPL" CFLAGS="-g -O2 -fPIC -Wall"
+    make SWIPL="$SWIPL"
 )
 
 # fail loudly if a library is missing (a failed link would otherwise only

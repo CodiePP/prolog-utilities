@@ -1,5 +1,5 @@
-#   Prolog Regexp Interface
-#   Copyright (C) 1999-2023  Alexander Diemand
+#   Prolog CGI Interface
+#   Copyright (C) 1999-2026  Alexander Diemand
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -14,69 +14,16 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# build rules and flags: ../mk/common.mk, ../mk/<uname -s>.def
 
-# load platform dependent settings (compiler, flags, libs...)
-ARCH = $(shell uname -s)
-ifeq ($(ARCH), IRIX64)
-ARCH=IRIX
-endif
-include $(ARCH).def
+NAME = plcgi
+SWI_OBJS =
+GP_OBJS = gp-cgi.gpo common.gpo
+QLF = src/cgi.qlf
+TOP_SRC = src/top-cgi.pl
+TOP_LIBS = ../pl_regexp/libplregexp-$(ARCH).a ../pl_toolbox/libpltoolbox-$(ARCH).a
 
-SWI_CFLAGS = $(DEF) $(OPT) $(SWI_ARCH_INC) $(DEBUG) $(WARN) $(PIC)
-SWI_LDFLAGS = $(SWI_ARCH_LDFLAGS)
-SWI_LDLIBS = $(SWI_ARCH_LIBS)
-GP_CFLAGS = $(DEF) $(OPT) $(GP_ARCH_INC) $(DEBUG) $(WARN) $(PIC)
-GP_LDFLAGS = $(GP_ARCH_LDFLAGS)
-GP_LDLIBS = $(GP_ARCH_LIBS)
+include ../mk/common.mk
 
-# module name
-MODULE = plcgi-$(ARCH)
-
-SRCDIR = src
-OBJDIR = obj-$(ARCH)
-
-GP_SRCS = $(SRCDIR)/gp-cgi.pl $(SRCDIR)/common.pl
-GP_OBJS = $(OBJDIR)/gp-cgi.gpo $(OBJDIR)/common.gpo
-
-SWI_SRCS = $(SRCDIR)/cgi.pl
-
-.SUFFIXES: .c
-
-# other implicit rules
-$(OBJDIR)/%.o : $(SRCDIR)/%.c
-	@echo "compiling $<"
-	$(CC) -c $(SWI_CFLAGS) -o $@ $<
-
-$(OBJDIR)/%.gpo : $(SRCDIR)/%.pl
-	@echo "compiling $<"
-	$(GPLC) -c -o $@ $<
-
-$(OBJDIR)/%.gpo : $(SRCDIR)/%.c
-	@echo "compiling $<"
-	$(GPLC) -c -o $@ $<
-
-$(SRCDIR)/%.qlf : $(SRCDIR)/%.pl
-	@echo "compiling $<"
-	$(SWIPL) -q -t "qcompile(\"$<\")."
-
-# rule to make it all
-all: lib$(MODULE).a $(SRCDIR)/cgi.qlf
-
-$(GP_OBJS) : $(GP_SRCS)
-
-lib$(MODULE).a: $(OBJDIR) $(GP_OBJS)
-	@echo "Building library $(MODULE)"
-	$(AR) -r -c $@ $(GP_OBJS)
-	$(RANLIB) $@
-top: $(SRCDIR)/top-cgi.pl lib$(MODULE).a
-	gplc -o $@ --new-top-level $(SRCDIR)/top-cgi.pl lib$(MODULE).a ../pl_regexp/libplregexp-$(ARCH).a ../pl_toolbox/libpltoolbox-$(ARCH).a
-
-clean:
-	@echo "Cleaning away everything."
-	@test -d $(OBJDIR) && rm -r $(OBJDIR); true
-	@test -f $(MODULE) && rm $(MODULE); true
-	@test -f lib$(MODULE).a && rm lib$(MODULE).a; true
-
-$(OBJDIR):
-	@mkdir $(OBJDIR)
-
+# cgi.pl includes common.pl
+$(QLF): $(SRCDIR)/common.pl

@@ -15,7 +15,7 @@ in ~/.swiplrc add to the search path:
 HOW TO COMPILE (SWI-Prolog)
 ---------------------------
 
-You might want to adapt the `.def` file for your platform.
+Platform settings (compiler, flags) are in `../mk/<uname -s>.def`.
 
 in this directory:
 

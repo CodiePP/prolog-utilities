@@ -21,7 +21,7 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- foreign(pl_regexp(+codes, +codes, term)).
+:- foreign(pl_regexp(term, term, term)).
 
 info_regexp :- write('Prolog Regexp Interface'),nl,
                       %                                %

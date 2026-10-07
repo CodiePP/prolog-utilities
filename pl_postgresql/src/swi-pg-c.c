@@ -104,13 +104,11 @@ static int write_pgsql_connection(IOSTREAM *s, atom_t a, int flags)
 
 static PL_blob_t pgsql_connection_blob =
 {
-	PL_BLOB_MAGIC,
-	PL_BLOB_UNIQUE,
-	"pgsql_connection",
-	release_pgsql_connection,
-	NULL,				/* compare */
-	write_pgsql_connection,
-	NULL,				/* acquire */
+	.magic   = PL_BLOB_MAGIC,
+	.flags   = PL_BLOB_UNIQUE,
+	.name    = "pgsql_connection",
+	.release = release_pgsql_connection,
+	.write   = write_pgsql_connection,
 };
 
 /* wraps a freshly opened libpq connection in a blob and unifies it with dbx */
