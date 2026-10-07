@@ -30,5 +30,5 @@ info_curl :- write('Prolog libcurl (HTTP) Interface'),nl,
              write('pl_curl_get(URL, Options, Status, Headers, Body)'),nl,
              write('  Options: param(Name,Value), header(Name,Value),'),nl,
              write('           basic_auth(User,Pass), bearer_auth(Token),'),nl,
-             write('           timeout(Secs), connect_timeout(Secs),'),nl,
+             write('           timeout(Secs), connect_timeout(Secs), max_body(Bytes),'),nl,
              write('           follow_redirect(Bool), ssl_verify(Bool), user_agent(Atom)'),nl.

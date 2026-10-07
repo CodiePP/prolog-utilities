@@ -32,4 +32,6 @@ getenv(A,B) :- environ(A,B).
 access_file(F,P) :- file_permission(F,P).
 atom_to_term(A,T,_) :- read_term_from_atom(A,T,[]).
 open_string(String,Stream) :- open_input_atom_stream(String,Stream).
+cgi_term_codes(T,Codes) :- write_to_codes(Codes,T).
+cgi_close_string(S) :- close_input_atom_stream(S).
 

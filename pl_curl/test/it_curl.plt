@@ -1,10 +1,6 @@
 % Integration tests for pl_curl_get/5 against pl_curl/test/http_fixture.pl.
 % Run with ci/it-curl.sh (starts the fixture first). Env: FIXTURE_PORT (18080).
 %
-% Note: option values must be atoms/strings; pl_curl_get/5 does not check the
-% type of its option arguments (param(y, 2) reads uninitialised memory), so
-% there is deliberately no test for that.
-%
 % Tests marked fixme document known defects (see the repo review); a fixme
 % test that starts to pass is reported as fixed, a failing one does not fail
 % the run. Drop the fixme option once the defect is resolved.
@@ -97,19 +93,66 @@ test(connection_refused_raises, [throws(error(_, 'pl_curl_get/5'))]) :-
 test(bad_url_raises, [throws(error(_, 'pl_curl_get/5'))]) :-
     pl_curl_get('http://no-such-host.invalid/', [connect_timeout(2)], _, _, _).
 
+% --- argument checking ----------------------------------------------
+
+test(param_value_not_text, [throws(error(type_error(text, 2), _))]) :-
+    get('/get', [param(y, 2)], _, _, _).
+
+test(header_name_not_text, [throws(error(type_error(text, f(x)), _))]) :-
+    get('/get', [header(f(x), '1')], _, _, _).
+
+test(timeout_not_integer, [throws(error(type_error(integer, abc), _))]) :-
+    get('/get', [timeout(abc)], _, _, _).
+
+test(options_not_a_list, [throws(error(type_error(list, foo), _))]) :-
+    get('/get', foo, _, _, _).
+
+test(many_params) :-
+    numlist(1, 40, Ns),
+    findall(param(K, V), ( member(N, Ns), atom_concat(k, N, K), atom_concat(v, N, V) ), Opts),
+    echo('/get', Opts, Args, _),
+    forall(member(param(K, V), Opts), memberchk(K=V, Args)).
+
+test(header_crlf_rejected, [throws(error(_, 'pl_curl_get/5'))]) :-
+    get('/get', [header('X-Test', 'a\r\nX-Other: injected')], _, _, _).
+
+test(bearer_crlf_rejected, [throws(error(_, 'pl_curl_get/5'))]) :-
+    get('/get', [bearer_auth('tok\r\nX-Other: injected')], _, _, _).
+
+test(long_bearer_token) :-
+    length(Cs, 4000), maplist(=(0'a), Cs), atom_codes(Tok, Cs),
+    echo('/get', [bearer_auth(Tok)], _, Headers),
+    atom_concat('Bearer ', Tok, Expected),
+    memberchk(authorization=Expected, Headers).
+
+% --- limits ------------------------------------------------------------
+
+test(redirect_limit, [throws(error(_, 'pl_curl_get/5'))]) :-
+    get('/loop', [], _, _, _).
+
+test(body_within_limit) :-
+    get('/big', [max_body(100000)], 200, _, Body),
+    atom_length(Body, 100000).
+
+test(body_over_limit, [throws(error(Msg, 'pl_curl_get/5'))]) :-
+    get('/big', [max_body(1000)], _, _, _),
+    atom(Msg).
+
+test(file_scheme_refused, [throws(error(_, 'pl_curl_get/5'))]) :-
+    tmp_file(plu, F),
+    setup_call_cleanup(( open(F, write, S), write(S, secret), close(S) ),
+                       ( atom_concat('file://', F, URL),
+                         pl_curl_get(URL, [], _, _, _) ),
+                       delete_file(F)).
+
+test(redirect_to_file_refused, [throws(error(_, 'pl_curl_get/5'))]) :-
+    get('/file', [], _, _, _).
+
 % --- known defects ----------------------------------------------------
 
 test(utf8_body_decoded, [fixme('body is returned as a Latin-1 atom; should be UTF-8')]) :-
     get('/utf8', [], 200, _, Body),
     atom_codes(Expected, [0'G, 0'r, 252, 223, 0'e, 0' , 128512]),
     Body == Expected.
-
-test(file_scheme_refused, [fixme('SEC-6: only http(s) should be accepted'),
-                           throws(error(_, 'pl_curl_get/5'))]) :-
-    tmp_file(plu, F),
-    setup_call_cleanup(( open(F, write, S), write(S, secret), close(S) ),
-                       ( atom_concat('file://', F, URL),
-                         pl_curl_get(URL, [], _, _, _) ),
-                       delete_file(F)).
 
 :- end_tests(curl_it).

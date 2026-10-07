@@ -22,8 +22,9 @@ pl_curl_get(+URL, +Options, -Status, -Headers, -Body)
   | `header(Name, Value)`        | extra request header; repeatable                     |
   | `basic_auth(User, Pass)`     | HTTP Basic authentication credentials                 |
   | `bearer_auth(Token)`         | sends `Authorization: Bearer <Token>`                 |
-  | `timeout(Seconds)`           | total request timeout                                 |
-  | `connect_timeout(Seconds)`   | connection-phase timeout                              |
+  | `timeout(Seconds)`           | total request timeout, default 300                    |
+  | `connect_timeout(Seconds)`   | connection-phase timeout, default 30                  |
+  | `max_body(Bytes)`            | maximum response body size, default 64 MiB            |
   | `follow_redirect(Bool)`      | follow `Location` redirects, default `true`           |
   | `ssl_verify(Bool)`           | verify the TLS certificate/host, default `true`       |
   | `user_agent(Atom)`           | custom `User-Agent` header                            |
@@ -36,6 +37,25 @@ A transport-level failure (DNS, connection refused, TLS handshake, timeout, ...)
 throws a Prolog exception. An HTTP error status (404, 500, ...) is *not* an
 exception — it is returned in `Status` like any other response, so the caller
 decides how to handle it.
+
+Option arguments must be text (atom, string or code list) or, for the
+timeouts and `max_body`, integers; anything else raises a `type_error`.
+At most 64 `param/2` and 64 `header/2` options are accepted.
+
+
+LIMITS AND SAFETY
+-----------------
+
+* Only `http://` and `https://` URLs are fetched, also when following
+  redirects (no `file://`, `ftp://`, ...).
+* At most 10 redirects are followed.
+* Requests time out after `timeout(Seconds)` (default 300 s; connecting after
+  `connect_timeout(Seconds)`, default 30 s). A value of 0 selects the default.
+* A response body larger than `max_body(Bytes)` (default 64 MiB) aborts the
+  request with an exception, so a hostile server cannot exhaust memory.
+* Header names/values, credentials and the user agent must not contain CR or
+  LF (that would allow injecting extra request headers); such a request
+  raises an exception before anything is sent.
 
 EXAMPLES
 --------
