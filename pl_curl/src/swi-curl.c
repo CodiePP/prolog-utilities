@@ -20,6 +20,10 @@
 #include <string.h>
 
 #include "SWI-Prolog.h"
+
+#if PLVERSION < 80000
+#error "needs SWI-Prolog >= 8.0"
+#endif
 #include "curl_core.h"
 
 /* pl_curl_get(+URL, +Options, -Status, -Headers, -Body)

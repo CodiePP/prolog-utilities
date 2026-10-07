@@ -91,7 +91,9 @@ Body = '{"args": {"hello": "world"}, ...}'.
 HOW TO COMPILE
 ---------------
 
-Requires the libcurl development headers (`curl/curl.h`) and library to be
+Requires libcurl >= 7.58.0 (checked when compiling and at run time; older
+versions forward a `bearer_auth` token to other hosts on redirects).
+The libcurl development headers (`curl/curl.h`) and library must be
 available to the compiler/linker — usually already the case on macOS and on
 Linux with `libcurl4-openssl-dev` (or equivalent) installed.
 

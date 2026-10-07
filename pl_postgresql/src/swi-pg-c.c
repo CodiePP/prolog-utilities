@@ -23,6 +23,18 @@
 
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
+
+#if PLVERSION < 80000
+#error "needs SWI-Prolog >= 8.0"
+#endif
+
+/* older names of BUF_STACK (< 8.5) and PL_PRUNED (< 8.3) */
+#ifndef BUF_STACK
+#define BUF_STACK BUF_RING
+#endif
+#ifndef PL_PRUNED
+#define PL_PRUNED PL_CUTTED
+#endif
 #include <libpq-fe.h>
 
 

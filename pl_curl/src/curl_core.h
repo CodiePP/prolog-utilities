@@ -21,6 +21,15 @@
 #include <stddef.h>
 #include <curl/curl.h>
 
+/* 7.58.0: libcurl no longer forwards a custom Authorization header (bearer_auth)
+ * when a redirect goes to another host. Older versions leak the token. */
+#define PL_CURL_MIN_VERSION_NUM 0x073A00
+#define PL_CURL_MIN_VERSION     "7.58.0"
+
+#if LIBCURL_VERSION_NUM < PL_CURL_MIN_VERSION_NUM
+#error "pl_curl needs libcurl >= 7.58.0"
+#endif
+
 /* limits applied unless the request overrides them */
 #define PL_CURL_DEFAULT_TIMEOUT          300L                 /* seconds, whole transfer */
 #define PL_CURL_DEFAULT_CONNECT_TIMEOUT  30L                  /* seconds */

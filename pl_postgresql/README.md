@@ -107,8 +107,9 @@ HOW TO COMPILE
 --------------
 
 ```sh
-aclocal --force && autoheader --force && autoconf --force
+autoreconf -fi
 ```
+(needs autoconf >= 2.70, which also installs the helper scripts in `config/`)
 then run
 ```sh
 ./configure

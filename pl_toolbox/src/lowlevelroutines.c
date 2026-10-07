@@ -27,6 +27,10 @@
 
 #include "SWI-Prolog.h"
 
+#if PLVERSION < 80000
+#error "needs SWI-Prolog >= 8.0"
+#endif
+
 
 foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname);
 

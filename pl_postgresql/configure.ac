@@ -1,13 +1,10 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 #
-# 1. run 'aclocal'
-# 2. run 'autoheader'
-# 3. run 'autoconf'
-# 4. run './configure'  (optionally with parameters)
-# 5. run 'make swi'
-#
-# subsequently: 'autoreconf -vfi'
+# 1. run 'autoreconf -fi'  (also installs config/install-sh, which is not
+#    kept in the repository)
+# 2. run './configure'  (optionally with parameters)
+# 3. run 'make swi'
 
 AC_PREREQ([2.69])
 AC_INIT(plpgsql, 1.0.0)
@@ -58,7 +55,7 @@ if [[ $ARCH = "Darwin" ]]; then
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${HOME}/.local/share/pkgconfig:/opt/homebrew/opt/openssl@1.1/lib/pkgconfig:/opt/homebrew/opt/postgresql/lib/pkgconfig"
 fi
 
-PKG_CHECK_MODULES([SWI], [swipl libssl libcrypto zlib libpq])
+PKG_CHECK_MODULES([SWI], [swipl >= 8.0 libssl libcrypto zlib libpq >= 9.0])
 
 SWI_BASE=$($PKG_CONFIG --variable=PLBASE swipl)
 SWI_ARCH=$($PKG_CONFIG --variable=PLARCH swipl)

@@ -233,6 +233,13 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
 
   memset(resp, 0, sizeof(*resp));
 
+  /* the headers may be newer than the library loaded at run time */
+  if (curl_version_info(CURLVERSION_NOW)->version_num < PL_CURL_MIN_VERSION_NUM) {
+    snprintf(resp->errbuf, sizeof(resp->errbuf), "libcurl %s is too old, need >= %s",
+             curl_version_info(CURLVERSION_NOW)->version, PL_CURL_MIN_VERSION);
+    return 0;
+  }
+
   for (i = 0; i < req->n_headers; i++) {
     if (has_crlf(req->headers[i].name) || has_crlf(req->headers[i].value) ||
         strchr(req->headers[i].name, ':')) {
