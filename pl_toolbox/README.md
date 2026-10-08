@@ -121,9 +121,12 @@ From the repository root `./make.sh pl_toolbox`, or in this directory
 INSTALLATION (SWI-Prolog)
 -------------------------
 
-Copy `pltoolbox-<platform>` to `~/lib/sbcl/pltoolbox` and
-`src/toolbox.qlf` to `~/lib/sbcl/toolbox.qlf`, and add the search path to
-your init file (`~/.config/swi-prolog/init.pl`):
+From the repository root, `ci/install.sh --init` installs all modules into
+`~/lib/sbcl`. By hand: copy `pltoolbox-<platform>` to `~/lib/sbcl/pltoolbox`,
+and `src/toolbox.pl`, the files it includes (`math.pl`, `string.pl`,
+`stream.pl`, `vector.pl`, `json.pl`) and `src/toolbox.qlf` to `~/lib/sbcl/`
+(a `.qlf` without its sources cannot be loaded by more than one module).
+Then add the search path to your init file (`~/.config/swi-prolog/init.pl`):
 
 ```prolog
 :- assertz(file_search_path(sbcl, '/home/<your username>/lib/sbcl')).

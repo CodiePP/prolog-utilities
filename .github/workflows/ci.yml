@@ -1,0 +1,44 @@
+# Build every module and run the unit tests (pl_*/test/*.plt, except it_*.plt)
+# on amd64 and arm64. Same scripts as the Forgejo workflows in .forgejo/.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: ci/install-deps.sh
+
+      - name: Build
+        run: ci/build.sh
+
+      - name: Unit tests (SWI-Prolog)
+        run: ci/test.sh
+
+      - name: JSON tests (GNU Prolog and SWI-Prolog)
+        run: |
+          . ci/env.sh
+          make -C pl_toolbox check SWIPL="$SWIPL"

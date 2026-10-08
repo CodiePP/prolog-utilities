@@ -46,7 +46,12 @@ All notable changes. The format follows
   goals.
 * `make asan`; `./make.sh` takes module names; clear messages when SWI-Prolog
   headers or `gplc` are missing; pinned `shell.nix`.
-* CI (Forgejo Actions) with unit and integration tests for all modules.
+* CI (Forgejo Actions and GitHub Actions) with unit and integration tests for
+  all modules, on amd64 and arm64.
+* Docker image `ghcr.io/codiepp/prolog-utilities` (amd64, arm64) with all
+  modules built and installed for the user `user`.
+* `ci/install-deps.sh` (Debian/Ubuntu requirements) and `ci/install.sh`
+  (installs the built modules into `~/lib/sbcl` and `~/lib/gprolog`).
 * SECURITY.md, this changelog, quickstarts in the READMEs.
 
 ### Fixed
