@@ -4,9 +4,9 @@
 # Runs as root or through sudo. Used by the GitHub workflows and the
 # Dockerfile.
 #
-# GNU Prolog is built from source: Ubuntu 24.04 has no arm64 package and
-# only 1.4.5 for amd64. The release tarball is checked against its SHA-256
-# (taken from the GPG-verified release, signed by Daniel Diaz).
+# GNU Prolog is built from source: Debian 13 and Ubuntu 24.04 have no arm64
+# package and only 1.4.5 for amd64. The release tarball is checked against
+# its SHA-256 (taken from the GPG-verified release, signed by Daniel Diaz).
 set -eu
 
 GPROLOG_VERSION=1.5.0

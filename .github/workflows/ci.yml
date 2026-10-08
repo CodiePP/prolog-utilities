@@ -1,5 +1,6 @@
 # Build every module and run the unit tests (pl_*/test/*.plt, except it_*.plt)
-# on amd64 and arm64. Same scripts as the Forgejo workflows in .forgejo/.
+# on amd64 and arm64, in Debian 13 containers. Same scripts as the Forgejo
+# workflows in .forgejo/.
 name: ci
 
 on:
@@ -22,8 +23,14 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
+    # GitHub only hosts Ubuntu runners; the job itself runs in Debian
+    container:
+      image: debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
     timeout-minutes: 30
     steps:
+      - name: Tools for the checkout
+        run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+
       - name: Check out repository code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

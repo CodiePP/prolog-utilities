@@ -42,8 +42,8 @@ M = ['1999/12/11', '1999', '12', '11'].
 
 Each module's README has a quickstart and the full API.
 
-Or use the Docker image (linux/amd64 and linux/arm64) with everything built
-and installed for the user `user`:
+Or use the Docker image (Debian 13, linux/amd64 and linux/arm64) with
+everything built and installed for the user `user`:
 
 ```sh
 docker run --rm -it ghcr.io/codiepp/prolog-utilities   # starts swipl
@@ -89,11 +89,11 @@ Requirements
 
 | dependency | minimum | tested with | needed by |
 |---|---|---|---|
-| SWI-Prolog (headers + `swipl`) | 8.0 | 8.5.12 | SWI-Prolog builds of all modules |
+| SWI-Prolog (headers + `swipl`) | 8.0 | 8.5.12, 9.0.4, 9.2.9 | SWI-Prolog builds of all modules |
 | GNU Prolog (`gplc`) | 1.4.0 | 1.5.0 | GNU Prolog builds (`pl_toolbox`, `pl_regexp`, `pl_cgi`, `pl_curl`) |
-| libcurl (headers + library) | 7.58.0 | 8.7.1 | `pl_curl` |
-| libpq (PostgreSQL client) | 9.0 | 16 | `pl_postgresql` (SWI-Prolog only) |
-| autoconf | 2.70 | 2.73 | `pl_postgresql` (`autoreconf -fi`) |
+| libcurl (headers + library) | 7.58.0 | 8.5.0, 8.7.1, 8.14.1 | `pl_curl` |
+| libpq (PostgreSQL client) | 9.0 | 16, 17 | `pl_postgresql` (SWI-Prolog only) |
+| autoconf | 2.70 | 2.71, 2.72, 2.73 | `pl_postgresql` (`autoreconf -fi`) |
 | pkg-config, make, C compiler | | | all |
 
 The minimums are enforced at build time (`#error` in the C bridges, version
@@ -121,7 +121,8 @@ requirements (GNU Prolog is built from source).
 The workflows in `.github/workflows` (GitHub Actions) and `.forgejo/workflows`
 (Forgejo) run these scripts: `ci` (build and unit tests, GitHub: amd64 and
 arm64), `it` (integration tests with a PostgreSQL service) and `image` (the
-Docker image above, pushed to `ghcr.io` from `main` and `v*` tags).
+Docker image above, pushed to `ghcr.io` from `main` and `v*` tags). On
+GitHub, `ci` and `it` run in Debian 13 containers on the hosted runners.
 
 Compiler and linker flags live in [mk/Linux.def](mk/Linux.def) and
 [mk/Darwin.def](mk/Darwin.def), the rules in [mk/common.mk](mk/common.mk),

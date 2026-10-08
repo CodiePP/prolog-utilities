@@ -10,7 +10,8 @@
 # in the image to rebuild or to link GNU Prolog programs.
 #
 # Built for linux/amd64 and linux/arm64 by .github/workflows/image.yml.
-FROM ubuntu:24.04
+# Debian 13 (trixie), pinned by digest; dependabot proposes updates
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 LABEL org.opencontainers.image.title="prolog-utilities" \
       org.opencontainers.image.description="SWI-Prolog and GNU Prolog utilities: JSON, regexp, CGI, libcurl and PostgreSQL bridges" \

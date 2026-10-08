@@ -1,5 +1,6 @@
 # Integration tests: pl_curl against a small SWI-Prolog HTTP server, and the
-# PostgreSQL bridge against a PostgreSQL service container.
+# PostgreSQL bridge against a PostgreSQL service container. Both jobs run in
+# Debian 13 containers.
 name: it
 
 on:
@@ -18,8 +19,14 @@ concurrency:
 jobs:
   curl:
     runs-on: ubuntu-24.04
+    # GitHub only hosts Ubuntu runners; the job itself runs in Debian
+    container:
+      image: debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
     timeout-minutes: 30
     steps:
+      - name: Tools for the checkout
+        run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+
       - name: Check out repository code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +40,9 @@ jobs:
 
   postgres:
     runs-on: ubuntu-24.04
+    # GitHub only hosts Ubuntu runners; the job itself runs in Debian
+    container:
+      image: debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
     timeout-minutes: 30
     services:
       postgres:
@@ -41,20 +51,22 @@ jobs:
           POSTGRES_USER: plu
           POSTGRES_PASSWORD: plu
           POSTGRES_DB: plu
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U plu -d plu"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+    # the job runs in a container, so the service is reached by its name
     env:
-      PGHOST: localhost
+      PGHOST: postgres
       PGPORT: "5432"
       PGUSER: plu
       PGPASSWORD: plu
       PGDATABASE: plu
     steps:
+      - name: Tools for the checkout
+        run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+
       - name: Check out repository code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
