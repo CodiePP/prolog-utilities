@@ -4,9 +4,9 @@
 # Runs as root or through sudo. Used by the GitHub workflows and the
 # Dockerfile.
 #
-# GNU Prolog is built from source: Ubuntu 24.04 has no arm64 package and
-# only 1.4.5 for amd64. The release tarball is checked against its SHA-256
-# (taken from the GPG-verified release, signed by Daniel Diaz).
+# GNU Prolog is built from source: Debian 13 and Ubuntu 24.04 have no arm64
+# package and only 1.4.5 for amd64. The release tarball is checked against
+# its SHA-256 (taken from the GPG-verified release, signed by Daniel Diaz).
 set -eu
 
 GPROLOG_VERSION=1.5.0
@@ -46,6 +46,9 @@ echo "${GPROLOG_SHA256}  gprolog-${GPROLOG_VERSION}.tar.gz" | sha256sum -c -
 tar xzf "gprolog-${GPROLOG_VERSION}.tar.gz"
 cd "gprolog-${GPROLOG_VERSION}/src"
 ./configure
-make -j"$(nproc)"
+# no "make -j": gplc derives its intermediate file names from
+# time(NULL) ^ getpid() and does not create them exclusively, so parallel
+# gplc runs (e.g. in Fd2C) can share temporary files and corrupt each other
+make
 $SUDO make install
 gplc --version | head -1

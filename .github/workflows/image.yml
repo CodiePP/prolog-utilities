@@ -2,7 +2,8 @@
 # for linux/amd64 and linux/arm64 and pushes it to the GitHub container
 # registry as ghcr.io/<owner>/<repo>.
 #
-# Each platform is built natively on its own runner and pushed by digest;
+# The image is Debian 13 (see the Dockerfile); the Ubuntu runners only run
+# docker. Each platform is built natively on its own runner and pushed by digest;
 # the merge job then creates the multi-platform tags:
 #   main          -> latest, main, sha-<commit>
 #   tag v1.2.3    -> 1.2.3, 1.2, sha-<commit>
