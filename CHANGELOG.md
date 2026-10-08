@@ -73,6 +73,7 @@ All notable changes. The format follows
 * pl_toolbox: `list2string/2,3` raised an instantiation error (broken since
   the GNU Prolog remake); values are now written as by `write/1` on both
   systems.
+* pl_toolbox: `vrand/2` never terminated (`N-1` was passed unevaluated).
 * pl_toolbox: `info_math` showed swapped formulas for `rad2grad/grad2rad`
   and a wrong value of pi.
 
