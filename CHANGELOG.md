@@ -31,6 +31,9 @@ All notable changes. The format follows
   `pl_pgsql_query/2` raises an error for failed statements (it reported
   success before). Text values starting with `NULL` are no longer returned as
   `[]`; only SQL NULL is.
+* pl_toolbox: `pl_temporary_file/3` raises exceptions (e.g.
+  `existence_error(directory, Dir)`) instead of printing "Error: ..." to
+  stdout and failing.
 * Build: the per-module `Linux.def`/`Darwin.def` files moved to `mk/`;
   pl_postgresql is prepared with `autoreconf -fi` (the vendored `config/`
   scripts are gone). Requires SWI-Prolog >= 8.0, GNU Prolog >= 1.4.0,

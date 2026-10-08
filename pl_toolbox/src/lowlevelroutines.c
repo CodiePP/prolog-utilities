@@ -44,10 +44,52 @@ install_t install()
 }
 
 
+/* error(system_error(Message), context(pl_temporary_file/3, _)) */
+static int system_error(const char *msg)
+{
+	term_t ex = PL_new_term_ref();
+
+	if (!PL_unify_term(ex,
+	                   PL_FUNCTOR_CHARS, "error", 2,
+	                     PL_FUNCTOR_CHARS, "system_error", 1,
+	                       PL_CHARS, msg,
+	                     PL_FUNCTOR_CHARS, "context", 2,
+	                       PL_FUNCTOR_CHARS, "/", 2,
+	                         PL_CHARS, "pl_temporary_file",
+	                         PL_INT, 3,
+	                       PL_VARIABLE)) {
+		return FALSE;
+	}
+	return PL_raise_exception(ex);
+}
+
+/* an atom argument: instantiation_error if unbound, type_error otherwise */
+static int get_atom_arg(term_t t, size_t *len, char **s)
+{
+	if (PL_is_variable(t))
+	{
+		return PL_instantiation_error(t);
+	}
+	if (!PL_get_atom_nchars(t, len, s))
+	{
+		return PL_type_error("atom", t);
+	}
+	return TRUE;
+}
+
+/* pl_temporary_file(+Dir, +Prefix, -File): creates a new empty file
+ * Dir/<Prefix>XXXXXX (mode 0600) and unifies File with its path.
+ * Errors are raised as exceptions (nothing is printed):
+ *   existence_error(directory, Dir)                Dir is not a directory
+ *   domain_error(temporary_file_prefix, Prefix)    Prefix contains '/'
+ *   representation_error(max_path_length)          path too long
+ *   permission_error(create, file, Dir)            no write permission
+ *   system_error(Message)                          other mkstemp failures */
 foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname)
 {
 	char    path[PATH_MAX];
 	char    prefix[6];
+	char    msg[PATH_MAX + 128];
 	char	*s;
 	size_t	dlen,plen;
 	struct stat st;
@@ -55,23 +97,11 @@ foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname)
 
 	if (! PL_is_variable(fname))
 	{
-		printf("  Error: fname should be a variable.\n");
-		PL_fail;
+		return PL_uninstantiation_error(fname);
 	}
-	if (! PL_is_atom(dir))
+	if (!get_atom_arg(pfx, &plen, &s))
 	{
-		printf("  Error: dir path should be an atom.\n");
-		PL_fail;
-	}
-	if (! PL_is_atom(pfx))
-	{
-		printf("  Error: prefix should be an atom.\n");
-		PL_fail;
-	}
-
-	if (!PL_get_atom_nchars(pfx, &plen, &s))
-	{
-		PL_fail;
+		return FALSE;
 	}
 	if (plen > 5)
 	{
@@ -81,23 +111,16 @@ foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname)
 	prefix[plen]='\0';
 	if (strlen(prefix) != plen || strchr(prefix,'/'))
 	{
-		printf("  Error: prefix must not contain '/' or NUL.\n");
-		PL_fail;
+		return PL_domain_error("temporary_file_prefix", pfx);
 	}
 
-	if (!PL_get_atom_nchars(dir, &dlen, &s))
+	if (!get_atom_arg(dir, &dlen, &s))
 	{
-		PL_fail;
+		return FALSE;
 	}
-	if (dlen == 0 || strlen(s) != dlen)
+	if (dlen == 0 || strlen(s) != dlen || stat(s, &st) != 0 || !S_ISDIR(st.st_mode))
 	{
-		printf("  Error: invalid directory path.\n");
-		PL_fail;
-	}
-	if (stat(s, &st) != 0 || !S_ISDIR(st.st_mode))
-	{
-		printf("  Error: %s is not a directory.\n", s);
-		PL_fail;
+		return PL_existence_error("directory", dir);
 	}
 
 	/* <dir>/<prefix>XXXXXX; mkstemp creates the file exclusively (O_EXCL,
@@ -106,15 +129,18 @@ foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname)
 	if (snprintf(path, sizeof(path), "%s%s%sXXXXXX", s,
 	             s[dlen-1] == '/' ? "" : "/", prefix) >= (int)sizeof(path))
 	{
-		printf("  Error: directory path too long.\n");
-		PL_fail;
+		return PL_representation_error("max_path_length");
 	}
 
 	fd = mkstemp(path);
 	if (fd < 0)
 	{
-		printf("  Error: cannot create temporary file in %s: %s\n", s, strerror(errno));
-		PL_fail;
+		if (errno == EACCES || errno == EPERM || errno == EROFS)
+		{
+			return PL_permission_error("create", "file", dir);
+		}
+		snprintf(msg, sizeof(msg), "cannot create a temporary file in %s: %s", s, strerror(errno));
+		return system_error(msg);
 	}
 	close(fd);
 	return PL_unify_atom_chars(fname, path);	// unify and succeed

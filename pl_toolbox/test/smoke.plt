@@ -51,11 +51,18 @@ test(unique_names) :-
     toolbox:pl_temporary_file(Dir, plu, F2),
     call_cleanup(F1 \== F2, ( delete_file(F1), delete_file(F2) )).
 
-test(missing_directory_fails, [fail]) :-
+test(missing_directory, [throws(error(existence_error(directory, '/no/such/directory'), _))]) :-
     toolbox:pl_temporary_file('/no/such/directory', plu, _).
 
-test(prefix_with_slash_fails, [fail]) :-
+test(prefix_with_slash, [throws(error(domain_error(temporary_file_prefix, 'a/b'), _))]) :-
     tmp_dir(Dir),
     toolbox:pl_temporary_file(Dir, 'a/b', _).
+
+test(unbound_dir, [throws(error(instantiation_error, _))]) :-
+    toolbox:pl_temporary_file(_, plu, _).
+
+test(file_must_be_unbound, [throws(error(uninstantiation_error(x), _))]) :-
+    tmp_dir(Dir),
+    toolbox:pl_temporary_file(Dir, plu, x).
 
 :- end_tests(toolbox_temporary_file).

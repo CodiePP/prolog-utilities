@@ -102,7 +102,10 @@ the export list are called as `toolbox:Name(...)`.
 
 `toolbox:pl_temporary_file(+Dir, +Prefix, -File)` creates a new empty file
 `Dir/<Prefix>XXXXXX` (at most 5 characters of Prefix are used) with mode 0600
-and returns its path; it fails if Dir is not a directory.
+and returns its path. Problems raise exceptions (nothing is printed):
+`existence_error(directory, Dir)`, `domain_error(temporary_file_prefix, P)`
+for a prefix containing `/`, `permission_error(create, file, Dir)`, and the
+usual instantiation and type errors.
 
 
 HOW TO COMPILE
