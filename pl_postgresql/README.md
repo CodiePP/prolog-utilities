@@ -123,12 +123,17 @@ then call `make`
 INSTALLATION
 ------------
 
-copy the plpgsql-<ARC> file to where your search path points to.
-I have added the following in the file ~/.config/swi-prolog/init.pl:
+From the repository root, `ci/install.sh --init` copies the library
+(`plpgsql`), `src/pgsql.pl` and `src/pgsql.qlf` (with the other modules) to
+`~/lib/sbcl` and adds that directory to the `sbcl` search path in
+`~/.config/swi-prolog/init.pl`:
 
-> :- assertz(file_search_path(sbcl,'/home/<username>/lib/sbcl')). 
+```prolog
+:- assertz(file_search_path(sbcl, '/home/<username>/lib/sbcl')).
+```
 
-also copy the src/pgsql.qlf to this directory
+Install the `.pl` file next to the `.qlf`: a `.qlf` file on its own cannot
+be loaded by more than one module.
 
 
 COMMENTS

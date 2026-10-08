@@ -1,0 +1,11 @@
+# keeps the pinned action SHAs and the Dockerfile base image up to date
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

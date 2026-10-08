@@ -1,0 +1,28 @@
+# build context for the Dockerfile: sources only, nothing built on the host
+.git
+.claude
+.vscode
+build
+**/obj-*
+**/*-Darwin
+**/*-Linux
+**/*.qlf
+**/*.gpo
+**/*.o
+**/lib*.a
+**/top
+**/*.cgi
+pl_curl/test-gp
+# pl_postgresql is configured inside the image
+pl_postgresql/Makefile
+pl_postgresql/configure
+pl_postgresql/config
+pl_postgresql/config.*
+pl_postgresql/aclocal.m4
+pl_postgresql/autom4te.cache
+pl_postgresql/src/config.h*
+pl_postgresql/plpgsql
+# local notes, never part of the image
+repo-review-*.md
+*.local
+*.patch

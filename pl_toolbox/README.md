@@ -102,7 +102,10 @@ the export list are called as `toolbox:Name(...)`.
 
 `toolbox:pl_temporary_file(+Dir, +Prefix, -File)` creates a new empty file
 `Dir/<Prefix>XXXXXX` (at most 5 characters of Prefix are used) with mode 0600
-and returns its path; it fails if Dir is not a directory.
+and returns its path. Problems raise exceptions (nothing is printed):
+`existence_error(directory, Dir)`, `domain_error(temporary_file_prefix, P)`
+for a prefix containing `/`, `permission_error(create, file, Dir)`, and the
+usual instantiation and type errors.
 
 
 HOW TO COMPILE
@@ -121,9 +124,12 @@ From the repository root `./make.sh pl_toolbox`, or in this directory
 INSTALLATION (SWI-Prolog)
 -------------------------
 
-Copy `pltoolbox-<platform>` to `~/lib/sbcl/pltoolbox` and
-`src/toolbox.qlf` to `~/lib/sbcl/toolbox.qlf`, and add the search path to
-your init file (`~/.config/swi-prolog/init.pl`):
+From the repository root, `ci/install.sh --init` installs all modules into
+`~/lib/sbcl`. By hand: copy `pltoolbox-<platform>` to `~/lib/sbcl/pltoolbox`,
+and `src/toolbox.pl`, the files it includes (`math.pl`, `string.pl`,
+`stream.pl`, `vector.pl`, `json.pl`) and `src/toolbox.qlf` to `~/lib/sbcl/`
+(a `.qlf` without its sources cannot be loaded by more than one module).
+Then add the search path to your init file (`~/.config/swi-prolog/init.pl`):
 
 ```prolog
 :- assertz(file_search_path(sbcl, '/home/<your username>/lib/sbcl')).

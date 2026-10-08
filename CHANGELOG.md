@@ -31,6 +31,9 @@ All notable changes. The format follows
   `pl_pgsql_query/2` raises an error for failed statements (it reported
   success before). Text values starting with `NULL` are no longer returned as
   `[]`; only SQL NULL is.
+* pl_toolbox: `pl_temporary_file/3` raises exceptions (e.g.
+  `existence_error(directory, Dir)`) instead of printing "Error: ..." to
+  stdout and failing.
 * Build: the per-module `Linux.def`/`Darwin.def` files moved to `mk/`;
   pl_postgresql is prepared with `autoreconf -fi` (the vendored `config/`
   scripts are gone). Requires SWI-Prolog >= 8.0, GNU Prolog >= 1.4.0,
@@ -46,7 +49,12 @@ All notable changes. The format follows
   goals.
 * `make asan`; `./make.sh` takes module names; clear messages when SWI-Prolog
   headers or `gplc` are missing; pinned `shell.nix`.
-* CI (Forgejo Actions) with unit and integration tests for all modules.
+* CI (Forgejo Actions and GitHub Actions) with unit and integration tests for
+  all modules, on amd64 and arm64.
+* Docker image `ghcr.io/codiepp/prolog-utilities` (amd64, arm64) with all
+  modules built and installed for the user `user`.
+* `ci/install-deps.sh` (Debian/Ubuntu requirements) and `ci/install.sh`
+  (installs the built modules into `~/lib/sbcl` and `~/lib/gprolog`).
 * SECURITY.md, this changelog, quickstarts in the READMEs.
 
 ### Fixed

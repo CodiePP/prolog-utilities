@@ -1,0 +1,67 @@
+# Integration tests: pl_curl against a small SWI-Prolog HTTP server, and the
+# PostgreSQL bridge against a PostgreSQL service container.
+name: it
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: it-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  curl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: ci/install-deps.sh
+      - name: Build
+        run: ci/build.sh
+      - name: pl_curl against the Prolog fixture server
+        run: ci/it-curl.sh
+
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: plu
+          POSTGRES_PASSWORD: plu
+          POSTGRES_DB: plu
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plu -d plu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: plu
+      PGPASSWORD: plu
+      PGDATABASE: plu
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install dependencies
+        run: ci/install-deps.sh
+      - name: Build
+        run: ci/build.sh
+      - name: pl_postgresql against the PostgreSQL service
+        run: ci/it-pgsql.sh

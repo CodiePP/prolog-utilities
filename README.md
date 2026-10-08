@@ -42,6 +42,17 @@ M = ['1999/12/11', '1999', '12', '11'].
 
 Each module's README has a quickstart and the full API.
 
+Or use the Docker image (linux/amd64 and linux/arm64) with everything built
+and installed for the user `user`:
+
+```sh
+docker run --rm -it ghcr.io/codiepp/prolog-utilities   # starts swipl
+```
+
+In the image, `~/prolog-utilities` holds the built source tree,
+`~/lib/sbcl` the SWI-Prolog modules (already on the `sbcl` search path) and
+`~/lib/gprolog` the GNU Prolog libraries; the compilers are included.
+
 
 Using the modules
 -----------------
@@ -55,6 +66,10 @@ directory and add it in your `~/.config/swi-prolog/init.pl`:
 ```prolog
 :- assertz(file_search_path(sbcl, '/home/<you>/lib/sbcl')).
 ```
+
+`ci/install.sh [--init] [PREFIX]` does the copying (into `PREFIX/lib/sbcl`
+and `PREFIX/lib/gprolog`, default `PREFIX` is `$HOME`); `--init` also adds
+the search path to your init file.
 
 Then load modules with `use_module(sbcl(toolbox))`, `sbcl(regexp)`,
 `sbcl(cgi)`, `sbcl(curl)`, `sbcl(pgsql)`.
@@ -99,7 +114,14 @@ make -C pl_regexp               # a single module (pl_postgresql: see its README
 ```
 
 `ci/build.sh` and `ci/test.sh` build everything into `build/stage` and run the
-unit tests, as the CI does.
+unit tests, as the CI does; `ci/it-curl.sh` and `ci/it-pgsql.sh` run the
+integration tests. On Debian/Ubuntu, `ci/install-deps.sh` installs all
+requirements (GNU Prolog is built from source).
+
+The workflows in `.github/workflows` (GitHub Actions) and `.forgejo/workflows`
+(Forgejo) run these scripts: `ci` (build and unit tests, GitHub: amd64 and
+arm64), `it` (integration tests with a PostgreSQL service) and `image` (the
+Docker image above, pushed to `ghcr.io` from `main` and `v*` tags).
 
 Compiler and linker flags live in [mk/Linux.def](mk/Linux.def) and
 [mk/Darwin.def](mk/Darwin.def), the rules in [mk/common.mk](mk/common.mk),

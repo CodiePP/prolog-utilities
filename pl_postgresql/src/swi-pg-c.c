@@ -317,7 +317,7 @@ foreign_t swi_pgsql_connect2(term_t p_hostname, term_t p_port, term_t p_user, te
 
 foreign_t swi_pgsql_disconnect (term_t dbx) 
 {
-  pq_connection_encoded *pgconn;
+  pq_connection_encoded *pgconn = NULL;
 
   if (!get_connection(dbx, &pgconn))
   {
@@ -448,7 +448,7 @@ static int exec_query(term_t dbx, term_t query, term_t params, const char *who, 
   size_t nparams = 0;
   PGresult *result;
   ExecStatusType status;
-  pq_connection_encoded *pgconn;
+  pq_connection_encoded *pgconn = NULL;
 
   *res = NULL;
   if (!get_open_connection(dbx, &pgconn, who))
