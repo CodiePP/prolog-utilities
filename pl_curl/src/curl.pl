@@ -24,3 +24,8 @@
 :- module(curl, [ pl_curl_get/5 ]).
 
 :- use_foreign_library(sbcl('plcurl')).
+
+% error(curl_error(Message), context(Predicate, _)) is raised by the foreign library
+:- multifile prolog:error_message//1.
+prolog:error_message(curl_error(Message)) -->
+	[ 'HTTP request failed: ~w'-[Message] ].

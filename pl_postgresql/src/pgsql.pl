@@ -35,6 +35,11 @@
 
 :- use_foreign_library(sbcl('plpgsql')).
 
+% error(pgsql_error(Message), context(Predicate, _)) is raised by the foreign library
+:- multifile prolog:error_message//1.
+prolog:error_message(pgsql_error(Message)) -->
+	[ 'PostgreSQL: ~w'-[Message] ].
+
 % encode(+String,-String)
 % encodes some characters in the string 
 pl_encode(In,Out) :-

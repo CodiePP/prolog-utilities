@@ -44,14 +44,20 @@ static void regexp_error(char *errbuf, size_t size, const char *prefix, int code
   }
 }
 
-/* throws error(Msg, 'pl_regexp/3'); does not return, so free everything first */
-static PlBool regexp_throw(const char *errbuf)
+/* throws error(Formal(Message), context(Name/Arity, _)); does not return,
+ * so everything must be freed before */
+static PlBool gp_throw_error(const char *formal, const char *msg, const char *name, int arity)
 {
-  PlTerm args[2];
+  PlTerm f[1], pi[2], ctx[2], err[2];
 
-  args[0] = Pl_Mk_Atom(Pl_Create_Allocate_Atom(errbuf));
-  args[1] = Pl_Mk_Atom(Pl_Create_Atom("pl_regexp/3"));
-  Pl_Throw(Pl_Mk_Compound(Pl_Create_Atom("error"), 2, args));
+  f[0] = Pl_Mk_Atom(Pl_Create_Allocate_Atom((char *)msg));
+  pi[0] = Pl_Mk_Atom(Pl_Create_Atom((char *)name));
+  pi[1] = Pl_Mk_Integer(arity);
+  ctx[0] = Pl_Mk_Compound(Pl_Create_Atom("/"), 2, pi);
+  ctx[1] = Pl_Mk_Variable();
+  err[0] = Pl_Mk_Compound(Pl_Create_Atom((char *)formal), 1, f);
+  err[1] = Pl_Mk_Compound(Pl_Create_Atom("context"), 2, ctx);
+  Pl_Throw(Pl_Mk_Compound(Pl_Create_Atom("error"), 2, err));
   return PL_FALSE;
 }
 
@@ -103,8 +109,8 @@ PlBool pl_regexp(PlTerm p_str, PlTerm p_pattern, PlTerm p_res)
   free(pattern_owned);
   if (reg_res != 0) {
     free(str_owned);
-    regexp_error(errbuf, sizeof(errbuf), "Compilation of regex failed: ", reg_res, &reg_comp);
-    return regexp_throw(errbuf);
+    regexp_error(errbuf, sizeof(errbuf), "", reg_res, &reg_comp);
+    return gp_throw_error("syntax_error", errbuf, "pl_regexp", 3);
   }
 
   nmatch = reg_comp.re_nsub + 1;   /* whole match + groups */
@@ -119,9 +125,9 @@ PlBool pl_regexp(PlTerm p_str, PlTerm p_pattern, PlTerm p_res)
     free(str_owned);
     free(reg_matches);
     if (reg_res != REG_NOMATCH) {
-      regexp_error(errbuf, sizeof(errbuf), "Execution of regex terminated with error: ", reg_res, &reg_comp);
+      regexp_error(errbuf, sizeof(errbuf), "", reg_res, &reg_comp);
       regfree(&reg_comp);
-      return regexp_throw(errbuf);
+      return gp_throw_error("regex_error", errbuf, "pl_regexp", 3);
     }
     regfree(&reg_comp);
     return PL_FALSE;

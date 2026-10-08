@@ -61,7 +61,7 @@ GP_LIB = lib$(NAME)-$(ARCH).a
 SWI_OBJ_FILES = $(addprefix $(OBJDIR)/,$(SWI_OBJS))
 GP_OBJ_FILES = $(addprefix $(OBJDIR)/,$(GP_OBJS))
 
-.PHONY: all top clean asan
+.PHONY: all top clean asan swi-check gp-check
 .SUFFIXES:
 
 all: $(if $(SWI_OBJS),$(SWI_LIB)) $(GP_LIB) $(QLF)
@@ -69,15 +69,29 @@ all: $(if $(SWI_OBJS),$(SWI_LIB)) $(GP_LIB) $(QLF)
 $(OBJDIR):
 	@mkdir -p $(OBJDIR)
 
-$(OBJDIR)/%.o : $(SRCDIR)/%.c | $(OBJDIR)
+# clear messages instead of "SWI-Prolog.h: file not found" / "gplc: not found"
+swi-check:
+	@test -f "$(PLBASE)/include/SWI-Prolog.h" || { \
+	  echo "error: SWI-Prolog headers not found (PLBASE='$(PLBASE)')." >&2; \
+	  echo "  Install SWI-Prolog including its headers and put 'swipl' on PATH," >&2; \
+	  echo "  or set PLBASE, PLLIBDIR and PLLIB (see 'swipl --dump-runtime-variables')." >&2; \
+	  exit 1; }
+
+gp-check:
+	@command -v $(GPLC) >/dev/null 2>&1 || { \
+	  echo "error: GNU Prolog compiler '$(GPLC)' not found." >&2; \
+	  echo "  Install GNU Prolog (>= 1.4.0) and put gplc on PATH, or set GPLC=/path/to/gplc." >&2; \
+	  exit 1; }
+
+$(OBJDIR)/%.o : $(SRCDIR)/%.c | $(OBJDIR) swi-check
 	@echo "compiling $<"
 	$(CC) -c $(SWI_CFLAGS) -o $@ $<
 
-$(OBJDIR)/%.gpo : $(SRCDIR)/%.pl | $(OBJDIR)
+$(OBJDIR)/%.gpo : $(SRCDIR)/%.pl | $(OBJDIR) gp-check
 	@echo "compiling $<"
 	$(GPLC) -c -o $@ $<
 
-$(OBJDIR)/%.gpo : $(SRCDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.gpo : $(SRCDIR)/%.c | $(OBJDIR) gp-check
 	@echo "compiling $<"
 	$(GPLC) -c -C '$(GP_CFLAGS)' -o $@ $<
 

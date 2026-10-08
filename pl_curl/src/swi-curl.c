@@ -33,13 +33,41 @@
 foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
                         term_t p_headers, term_t p_body);
 
-#define PLException(msg, who)                                                         \
-	{                                                                                  \
-		term_t except = PL_new_term_ref();                                            \
-		if (!PL_unify_term(except, PL_FUNCTOR_CHARS, "error", 2, PL_CHARS, msg, PL_CHARS, who)) \
-			return FALSE;                                                             \
-		return PL_raise_exception(except);                                            \
+/* raises error(Formal(Message), context(Name/Arity, _)); who is "Name/Arity".
+ * Trailing white space (libpq/regerror messages end with a newline) is removed. */
+static int raise_error(const char *formal, const char *msg, const char *who)
+{
+	char name[64];
+	char text[1024];
+	const char *slash = strrchr(who, '/');
+	size_t n = slash ? (size_t)(slash - who) : strlen(who);
+	term_t ex = PL_new_term_ref();
+
+	if (n >= sizeof(name)) {
+		n = sizeof(name) - 1;
 	}
+	memcpy(name, who, n);
+	name[n] = '\0';
+	snprintf(text, sizeof(text), "%s", msg);
+	for (n = strlen(text); n > 0 && (text[n-1] == '\n' || text[n-1] == '\r' || text[n-1] == ' '); n--) {
+		text[n-1] = '\0';
+	}
+	msg = text;
+	if (!PL_unify_term(ex,
+	                   PL_FUNCTOR_CHARS, "error", 2,
+	                     PL_FUNCTOR_CHARS, formal, 1,
+	                       PL_CHARS, msg,
+	                     PL_FUNCTOR_CHARS, "context", 2,
+	                       PL_FUNCTOR_CHARS, "/", 2,
+	                         PL_CHARS, name,
+	                         PL_INT, slash ? atoi(slash + 1) : 0,
+	                       PL_VARIABLE)) {
+		return FALSE;
+	}
+	return PL_raise_exception(ex);
+}
+
+#define PLException(formal, msg, who) return raise_error(formal, msg, who)
 
 install_t install()
 {
@@ -246,7 +274,7 @@ foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
 		char errmsg[512];
 		snprintf(errmsg, sizeof(errmsg), "%s", resp.errbuf);
 		strings_free(&st);
-		PLException(errmsg, "pl_curl_get/5");
+		PLException("curl_error", errmsg, "pl_curl_get/5");
 	}
 	strings_free(&st);
 

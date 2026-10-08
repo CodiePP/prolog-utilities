@@ -42,7 +42,8 @@
  *   user_agent(Atom)
  *
  * Headers is unified with a list of Name-Value atom pairs.
- * on transport error, an exception is thrown.
+ * on transport error, error(curl_error(Message), context(pl_curl_get/5, _))
+ * is thrown.
  */
 
 enum gp_body_type { GP_BODY_ATOM, GP_BODY_CODES };
@@ -70,6 +71,23 @@ static PlBool gp_unify_body_codes(const pl_curl_response *resp, PlTerm body)
   return ok;
 }
 
+/* throws error(Formal(Message), context(Name/Arity, _)); does not return,
+ * so everything must be freed before */
+static PlBool gp_throw_error(const char *formal, const char *msg, const char *name, int arity)
+{
+  PlTerm f[1], pi[2], ctx[2], err[2];
+
+  f[0] = Pl_Mk_Atom(Pl_Create_Allocate_Atom((char *)msg));
+  pi[0] = Pl_Mk_Atom(Pl_Create_Atom((char *)name));
+  pi[1] = Pl_Mk_Integer(arity);
+  ctx[0] = Pl_Mk_Compound(Pl_Create_Atom("/"), 2, pi);
+  ctx[1] = Pl_Mk_Variable();
+  err[0] = Pl_Mk_Compound(Pl_Create_Atom((char *)formal), 1, f);
+  err[1] = Pl_Mk_Compound(Pl_Create_Atom("context"), 2, ctx);
+  Pl_Throw(Pl_Mk_Compound(Pl_Create_Atom("error"), 2, err));
+  return PL_FALSE;
+}
+
 static int gp_curl_bool(PlTerm t)
 {
   int a = Pl_Rd_Atom_Check(t);
@@ -85,7 +103,6 @@ PlBool pl_curl_get(PlTerm p_url, PlTerm p_opts, PlTerm p_status, PlTerm p_header
   int n_params = 0, n_headers = 0;
   PlTerm lst = p_opts;
   enum gp_body_type body_type = GP_BODY_ATOM;
-  PlTerm exc;
 
   memset(&req, 0, sizeof(req));
   req.follow_redirect = 1;
@@ -146,9 +163,7 @@ PlBool pl_curl_get(PlTerm p_url, PlTerm p_opts, PlTerm p_status, PlTerm p_header
   req.n_headers = n_headers;
 
   if (!pl_curl_get_perform(&req, &resp)) {
-    exc = Pl_Mk_String(resp.errbuf);
-    Pl_Throw(exc);
-    return PL_FALSE;
+    return gp_throw_error("curl_error", resp.errbuf, "pl_curl_get", 5);
   }
 
   {

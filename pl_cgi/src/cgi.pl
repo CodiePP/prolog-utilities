@@ -36,7 +36,6 @@
 :- dynamic(cgi_in/2).         % keeps the content of the cgi variables
 :- dynamic(cgi_cookies/2).    % keeps the content of the cookies
 
-pl_regexp(A,B,C) :- regexp:pl_regexp(A,B,C).
 
 open_atom_input_stream(A,S) :- open_string(A,S).
 cgi_term_codes(T,Codes) :- format(codes(Codes),'~w',[T]).

@@ -37,13 +37,41 @@
  */
 foreign_t swi_regexp(term_t str, term_t pattern, term_t res);
 
-#define PLException(msg, who)                                                              \
-	{                                                                                      \
-		term_t except = PL_new_term_ref();                                                 \
-		if (!PL_unify_term(except, PL_FUNCTOR_CHARS, "error", 2, PL_CHARS, msg, PL_CHARS, who)) \
-			return FALSE;                                                                  \
-		return PL_raise_exception(except);                                                 \
+/* raises error(Formal(Message), context(Name/Arity, _)); who is "Name/Arity".
+ * Trailing white space (libpq/regerror messages end with a newline) is removed. */
+static int raise_error(const char *formal, const char *msg, const char *who)
+{
+	char name[64];
+	char text[1024];
+	const char *slash = strrchr(who, '/');
+	size_t n = slash ? (size_t)(slash - who) : strlen(who);
+	term_t ex = PL_new_term_ref();
+
+	if (n >= sizeof(name)) {
+		n = sizeof(name) - 1;
 	}
+	memcpy(name, who, n);
+	name[n] = '\0';
+	snprintf(text, sizeof(text), "%s", msg);
+	for (n = strlen(text); n > 0 && (text[n-1] == '\n' || text[n-1] == '\r' || text[n-1] == ' '); n--) {
+		text[n-1] = '\0';
+	}
+	msg = text;
+	if (!PL_unify_term(ex,
+	                   PL_FUNCTOR_CHARS, "error", 2,
+	                     PL_FUNCTOR_CHARS, formal, 1,
+	                       PL_CHARS, msg,
+	                     PL_FUNCTOR_CHARS, "context", 2,
+	                       PL_FUNCTOR_CHARS, "/", 2,
+	                         PL_CHARS, name,
+	                         PL_INT, slash ? atoi(slash + 1) : 0,
+	                       PL_VARIABLE)) {
+		return FALSE;
+	}
+	return PL_raise_exception(ex);
+}
+
+#define PLException(formal, msg, who) return raise_error(formal, msg, who)
 
 install_t install()
 {
@@ -72,13 +100,9 @@ foreign_t swi_regexp(term_t p_str, term_t p_pattern, term_t p_res)
 	term_t val, lst;
 	int ok = TRUE;
 
-	if (!PL_is_variable(p_res))
-	{
-		PL_fail;
-	}
 	if (PL_is_variable(p_str) || PL_is_variable(p_pattern))
 	{
-		PLException("input uninstantiated", "pl_regexp/3");
+		return PL_instantiation_error(PL_is_variable(p_str) ? p_str : p_pattern);
 	}
 
 	/* BUF_STACK: str must stay valid while pattern is converted */
@@ -93,8 +117,8 @@ foreign_t swi_regexp(term_t p_str, term_t p_pattern, term_t p_res)
 
 	if ((reg_res = regcomp(&reg_comp, pattern, REG_EXTENDED)) != 0)
 	{
-		regexp_error(errbuf, sizeof(errbuf), "Compilation of regex failed: ", reg_res, &reg_comp);
-		PLException(errbuf, "pl_regexp/3");
+		regexp_error(errbuf, sizeof(errbuf), "", reg_res, &reg_comp);
+		PLException("syntax_error", errbuf, "pl_regexp/3");
 	}
 
 	nmatch = reg_comp.re_nsub + 1;	/* whole match + groups */
@@ -109,13 +133,13 @@ foreign_t swi_regexp(term_t p_str, term_t p_pattern, term_t p_res)
 	{
 		if (reg_res != REG_NOMATCH)
 		{
-			regexp_error(errbuf, sizeof(errbuf), "Execution of regex terminated with error: ", reg_res, &reg_comp);
+			regexp_error(errbuf, sizeof(errbuf), "", reg_res, &reg_comp);
 		}
 		free(reg_matches);
 		regfree(&reg_comp);
 		if (reg_res != REG_NOMATCH)
 		{
-			PLException(errbuf, "pl_regexp/3");
+			PLException("regex_error", errbuf, "pl_regexp/3");
 		}
 		PL_fail;
 	}

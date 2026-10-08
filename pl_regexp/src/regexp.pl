@@ -21,9 +21,13 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
-:- module(regexp, [ ]).
+:- module(regexp, [ pl_regexp/3 ]).
 
-regexp:init :-
-	load_foreign_library(sbcl('plregexp')).
+:- use_foreign_library(sbcl('plregexp')).
 
-:- initialization(regexp:init).
+% error(regex_error(Message), context(pl_regexp/3, _)) is raised by the
+% foreign library when matching fails with an error (an invalid pattern
+% raises a standard syntax_error)
+:- multifile prolog:error_message//1.
+prolog:error_message(regex_error(Message)) -->
+	[ 'regular expression matching failed: ~w'-[Message] ].

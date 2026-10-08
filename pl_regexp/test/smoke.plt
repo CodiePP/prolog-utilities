@@ -20,8 +20,14 @@ test(unmatched_group_is_empty) :-
 test(no_match, [fail]) :-
     regexp:pl_regexp("abcdefg", "GNU", _).
 
-test(invalid_pattern, [throws(error(_, 'pl_regexp/3'))]) :-
+test(invalid_pattern, [throws(error(syntax_error(_), context(pl_regexp/3, _)))]) :-
     regexp:pl_regexp("abc", "a(b", _).
+
+test(unbound_input, [throws(error(instantiation_error, _))]) :-
+    pl_regexp(_, "a", _).
+
+test(exported) :-
+    pl_regexp("abc", "b", [b]).
 
 test(pattern_not_text, [throws(error(type_error(text, f(x)), _))]) :-
     regexp:pl_regexp("abc", f(x), _).

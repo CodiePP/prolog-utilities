@@ -17,7 +17,9 @@ Matches `String` against the POSIX extended regular expression `Pattern`
   pattern, in order. A group that did not take part in the match (e.g.
   `(b)?`) gives `''`. A pattern without groups gives `[Whole]`.
 * Fails if `String` does not match.
-* Raises `error(Message, 'pl_regexp/3')` if `Pattern` is invalid.
+* Raises `error(syntax_error(Message), context(pl_regexp/3, _))` if
+  `Pattern` is invalid, and `instantiation_error` if `String` or `Pattern`
+  is unbound.
 
 Both the SWI-Prolog and the GNU Prolog bridge follow this contract. (Before
 2026-10, the SWI-Prolog bridge returned `[]` for patterns without groups and
@@ -35,7 +37,7 @@ use_module(sbcl(regexp)).
 1) something that works:
 
 ```
-| ?- regexp:pl_regexp("1999/12/11", "([0-9]+)/(.*)/(.*)", X).
+| ?- pl_regexp("1999/12/11", "([0-9]+)/(.*)/(.*)", X).
 
 X = ['1999/12/11', '1999', '12', '11']
 
@@ -45,7 +47,7 @@ Yes
 2) when it fails:
 
 ```
-| ?- regexp:pl_regexp("abcdefg","GNU", X).
+| ?- pl_regexp("abcdefg","GNU", X).
 
 no
 ```

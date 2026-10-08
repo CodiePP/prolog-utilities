@@ -39,7 +39,8 @@ pl_curl_get(+URL, +Options, -Status, -Headers, -Body)
   `body_as(codes)` for binary data.
 
 A transport-level failure (DNS, connection refused, TLS handshake, timeout, ...)
-throws a Prolog exception. An HTTP error status (404, 500, ...) is *not* an
+throws `error(curl_error(Message), context(pl_curl_get/5, _))`, where Message
+is libcurl's description of the problem. An HTTP error status (404, 500, ...) is *not* an
 exception — it is returned in `Status` like any other response, so the caller
 decides how to handle it.
 
