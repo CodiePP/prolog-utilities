@@ -1,16 +1,19 @@
-
+<!DOCTYPE html>
 <html>
-<header>
-</header
+<head>
+<title>pl_cgi test</title>
+</head>
 <body>
+<h1>Hello @name@</h1>
+
 <h2>environment</h2>
 <pre>
-{cgi_env(A,B),format("~a:~a~n",[A,B]),fail.}
+{cgi_env(A,B),write(A),write(':'),write_html_escaped(B),nl,fail.}
 </pre>
 
 <h2>variables</h2>
 <pre>
-{cgi_in(A,B),format("~a:~a~n",[A,B]),fail.}
+{cgi_in(A,B),write_html_escaped(A),write(':'),write_html_escaped(B),nl,fail.}
 </pre>
-
+</body>
 </html>

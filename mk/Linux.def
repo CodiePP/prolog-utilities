@@ -1,4 +1,4 @@
-#   Prolog libcurl (HTTP) Interface
+#   Prolog utilities -- platform settings for Linux (see mk/common.mk)
 #   Copyright (C) 1999-2026  Alexander Diemand
 #
 #   This program is free software: you can redistribute it and/or modify
@@ -13,43 +13,19 @@
 #
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
-# Platform dependent settings to Makefile
-
-# C/C++ compiler and flags
 CC = gcc
-OPT = -O1 #-O3 -pipe -fomit-frame-pointer
+OPT = -O2
 DEF = -D$(ARCH)
-#DEBUG = -g0  # nodebug
 DEBUG = -g
-WARN = -Wall
+WARN = -Wall -Wextra -Wformat=2 -Wno-unused-parameter
 PIC = -fPIC
-
-# GNU Prolog compiler
+# undefine first: some distributions already set _FORTIFY_SOURCE
+FORTIFY = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+HARDEN = -fstack-protector-strong
+HARDEN_LDFLAGS = -Wl,-z,relro,-z,now
 GPLC = gplc
-
-# SWI-Prolog compiler
 SWIPL = swipl
-
-# linker for object files
-LINK = ld
-
-# static library
-ARFLAGS = -ruv
+LINK = $(CC)
+AR = ar
 RANLIB = ranlib
-
-# include path and library settings
-# add other include paths here, i.e. -I/usr/local/include
-SWI_ARCH_INC = -I${PLBASE}/include/
-
-# add other linker flags here, i.e. -L/usr/local/lib
-SWI_ARCH_LDFLAGS = -L${PLLIBDIR} -shared
-
-# add other libraries here, i.e. -liostream
-SWI_ARCH_LIBS = ${PLLIB} -lcurl
-
-# GNU Prolog: include path and library settings
-GP_ARCH_INC =
-GP_ARCH_LDFLAGS =
-GP_ARCH_LIBS = -lcurl

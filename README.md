@@ -2,6 +2,72 @@
 Prolog utilities
 ================
 
+Libraries that give SWI-Prolog and GNU Prolog programs access to things the
+base systems lack or handle differently: HTTP requests (libcurl), PostgreSQL,
+POSIX regular expressions, CGI scripting with HTML templates, and a toolbox
+with JSON, string, stream and vector helpers. Each module is a small C
+bridge and/or Prolog code, built for both Prolog systems where possible.
+
+| module | what it does | SWI-Prolog | GNU Prolog | needs |
+|---|---|---|---|---|
+| [pl_toolbox](pl_toolbox) | JSON parser/encoder, strings, streams, maths, vectors, safe temporary files | yes | yes (no temp files) | |
+| [pl_regexp](pl_regexp) | POSIX extended regular expressions: `pl_regexp/3` | yes | yes | libc `<regex.h>` |
+| [pl_cgi](pl_cgi) | CGI requests, cookies, HTML templates with escaping | yes | yes | pl_toolbox, pl_regexp |
+| [pl_curl](pl_curl) | HTTP(S) GET with parameters, headers, auth, limits: `pl_curl_get/5` | yes | yes | libcurl |
+| [pl_postgresql](pl_postgresql) | PostgreSQL queries, parameterised statements | yes | no | libpq |
+
+Supported platforms: Linux and macOS.
+
+
+Quickstart
+----------
+
+```sh
+nix-shell                  # or install the requirements below yourself
+ci/build.sh                # builds all modules into build/stage
+swipl -f ci/init.pl        # SWI-Prolog with the sbcl search path set up
+```
+
+```prolog
+?- use_module(sbcl(curl)), use_module(sbcl(toolbox)).
+?- pl_curl_get('https://api.example.org/search',      % some JSON API
+               [param(q, prolog), timeout(10)],
+               Status, _Headers, Body),
+   from_json(Body, Json).
+
+?- use_module(sbcl(regexp)).
+?- pl_regexp("1999/12/11", "([0-9]+)/(.*)/(.*)", M).
+M = ['1999/12/11', '1999', '12', '11'].
+```
+
+Each module's README has a quickstart and the full API.
+
+
+Using the modules
+-----------------
+
+The SWI-Prolog modules find each other and their foreign libraries through
+the file search path alias `sbcl`. Either use `swipl -f ci/init.pl` in this
+repository (after `ci/build.sh`), or copy the foreign libraries
+(`pl_*/<name>-<platform>`, renamed to `<name>`) and the `.qlf` files to a
+directory and add it in your `~/.config/swi-prolog/init.pl`:
+
+```prolog
+:- assertz(file_search_path(sbcl, '/home/<you>/lib/sbcl')).
+```
+
+Then load modules with `use_module(sbcl(toolbox))`, `sbcl(regexp)`,
+`sbcl(cgi)`, `sbcl(curl)`, `sbcl(pgsql)`.
+
+With GNU Prolog, link the libraries into your program, e.g.
+`gplc prog.pl pl_curl/libplcurl-$(uname -s).a -L '-lcurl -pthread'`.
+
+Errors are raised as `error(Formal, context(Predicate, _))`, the same with
+both Prolog systems: standard ISO formals (`type_error`, `instantiation_error`,
+...) for bad arguments, and `curl_error(Message)`, `pgsql_error(Message)`,
+`regex_error(Message)` or `syntax_error(Message)` (invalid regular
+expression) for failures reported by the libraries.
+
 
 Requirements
 ------------
@@ -23,90 +89,49 @@ does not forward a `bearer_auth` token to another host on a redirect.
 `nix-shell` (see [shell.nix](shell.nix), pinned nixpkgs) provides all of them.
 
 
-[pl_toolbox](pl_toolbox)
-----------
+Building
+--------
 
-```
- ?- toolbox:info_math.
-Prolog Toolbox, Mathematical Functors
-pi(X)                       X is 3.14169....
-e(X)                        X is 2.71828....
-det([[X1,X2][Y1,Y2]],D)     D is the determinant
-rad2grad(R,G)               G=R/180*PI
-grad2rad(G,R)               R=G*180/PI
+```sh
+./make.sh                       # all modules, stops at the first failure
+./make.sh pl_toolbox pl_curl    # only some
+make -C pl_regexp               # a single module (pl_postgresql: see its README)
 ```
 
-```
- ?- toolbox:info_vector.
-Prolog Toolbox, Vector Arithmetic
-vrand(N,V)                  vector containing N random numbers
-vzero(N,V)                  vector containing N dimensions, all zero
-vnorm(V,Vnorm)              Vnorm = V / |V|
-vval(V,Value)               Value = |V|
-vsum(V,Value)               Value = Sigma(V)
-vadd(V1,V2,Vres)            Vres = V1 + V2
-vsub(V1,V2,Vres)            Vres = V2 - V1
-vmul(Konst,V,Vres)          Vres = Konst * V
-vdiv(Konst,V,Vres)          Vres = V / Konst
-vdist(V1,V2,Distance)       Distance = |V1 - V2|
-vscal(V1,V2,Product)        Product = V1 * V2
-vprod(V1,V2,Vres)           Vres = V1 x V2
-vmix(V1,V2,V3,Res)          Res = (V1 x V2) * V3
-```
+`ci/build.sh` and `ci/test.sh` build everything into `build/stage` and run the
+unit tests, as the CI does.
 
-```
- ?- toolbox:info_string.
-Prolog Toolbox, String handling
-removesublist(ListIn,SubL,ListOut) Removes all occurencies of SubL in ListIn
-sub_string(Str,From,To,Res)        extracts substring From position To from Str
-list2string(List,String)           makes a string from a list separated by " "
-list2string(List,Sep,String)       makes a string from a list separated by Sep
-string2list(String,Lres)           makes a list of tokens from string by " "
-string2list(String,Sep,Lres)       makes a list of tokens from string by Sep
-split(Str,Char,Res1,Res2)          splits at first Char into Res1 and rest to Res2
-remove_leading(Str,Char,Res)       removes leading Chars from Str, always true
-remove_trailing(Str,Char,Res)      removes trailing Chars from Str, always true
-skip(Str,Num,Res)                  skips Num chars in Str and returns as Res
-align_left(Str,Width,Res)          aligns Str to the left, appends spaces
-align_right(Str,Width,Res)         aligns Str to the right, fills with spaces
-lower_case(Str,LowerS)             changes Str to lowercase
-upper_case(Str,UpperS)             changes Str to uppercase
+Compiler and linker flags live in [mk/Linux.def](mk/Linux.def) and
+[mk/Darwin.def](mk/Darwin.def), the rules in [mk/common.mk](mk/common.mk),
+shared by all module Makefiles. The C code is built with `-Wall -Wextra
+-Wformat=2`, `_FORTIFY_SOURCE=2`, `-fstack-protector-strong` and, on Linux,
+full RELRO (`-z relro -z now`).
+
+`make asan` (in a module directory) rebuilds that module's libraries with
+AddressSanitizer and UndefinedBehaviorSanitizer. `swipl` itself is not
+instrumented, so the runtime must be preloaded; leak detection does not work
+with `swipl` and must be off:
+
+```sh
+# Linux (gcc)
+LD_PRELOAD="$(gcc -print-file-name=libasan.so) $(gcc -print-file-name=libubsan.so)" \
+ASAN_OPTIONS=detect_leaks=0 swipl ...
+# macOS (clang); an AddressSanitizer "failed to deallocate" message when
+# swipl exits can be ignored
+DYLD_INSERT_LIBRARIES="$(cc -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" \
+ASAN_OPTIONS=detect_leaks=0 swipl ...
 ```
 
-```
- ?- toolbox:info_stream.
-Prolog Toolbox, Stream handling
-read_txtline(String)             reads a line from the current text Stream into String
-read_txtline(Stream,String)      reads a line from a text Stream into String
-read_binline(Stream,String)      reads a line from a binary Stream into String
-read_txtuntil(Sep,String)        reads a line from the current text Stream into String until Sep occurs
-read_txtuntil(Stream,Sep,String) reads a line from a text Stream into String until Sep occurs
-read_binuntil(Stream,Sep,String) reads a line from a text Stream into String until Sep occurs
-write_txtline(String)            writes a string to the current text stream.
-write_txtline(Stream,String)     writes a string to the text stream.
-write_binline(Stream,String)     writes a string to the binary stream.
-read_n_bytes(Stream,N,Res)       reads up to N bytes from the binary Stream.
-read_n_chars(Stream,N,Res)       reads up to N chars from the text Stream.
-read_int_[BE|LE](Stream,Int)     reads a 32 bit integer from the binary Stream.
-read_short_[BE|LE](Stream,Int)   reads a 16 bit integer from the binary Stream.
-read_double_[BE|LE](Stream,Res)  reads a double in ieee extended format from the binary Stream.
-```
-
-[pl_regexp](pl_regexp)
----------
+Run `make clean all` afterwards to get the normal build back.
 
 
-[pl_cgi](pl_cgi)
-------
+More
+----
 
+* [CHANGELOG.md](CHANGELOG.md): changes, including incompatible ones.
+* [SECURITY.md](SECURITY.md): reporting vulnerabilities, and what each module
+  protects against.
 
-[pl_postgresql](pl_postgresql/)
--------------
-
-
-
-
-Licensed under [GPL v3](LICENSE)
 
 LICENSE
 -------

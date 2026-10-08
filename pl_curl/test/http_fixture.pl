@@ -12,6 +12,8 @@
 %   /loop           303 to itself (redirect limit)
 %   /big            text/plain body of 100000 bytes (body size limit)
 %   /file           302 to file:///etc/passwd (redirect protocol restriction)
+%   /conn           text/plain id of the TCP connection (keep-alive tests)
+%   /binary         application/octet-stream body: bytes 97, 0, 98, 255
 
 :- encoding(utf8).
 
@@ -28,6 +30,8 @@
 :- http_handler(root(loop),     handle_loop,     []).
 :- http_handler(root(big),      handle_big,      []).
 :- http_handler(root(file),     handle_file,     []).
+:- http_handler(root(conn),     handle_conn,     []).
+:- http_handler(root(binary),   handle_binary,   []).
 
 handle_get(Request) :-
     ( memberchk(search(Search), Request) -> true ; Search = [] ),
@@ -79,6 +83,23 @@ handle_file(_Request) :-
     format('Status: 302~n'),
     format('Location: file:///etc/passwd~n'),
     format('Content-type: text/plain~n~n').
+
+% a new connection has a new input stream, which gets a new alias
+handle_conn(Request) :-
+    memberchk(input(In), Request),
+    (   stream_property(In, alias(Id))
+    ->  true
+    ;   flag(fixture_conn, N, N + 1),
+        atom_concat(conn, N, Id),
+        set_stream(In, alias(Id))
+    ),
+    format('Content-type: text/plain~n~n'),
+    format('~w', [Id]).
+
+handle_binary(_Request) :-
+    format('Content-type: application/octet-stream~n~n'),
+    set_stream(current_output, encoding(octet)),
+    format('~s', [[97, 0, 98, 255]]).
 
 main :-
     current_prolog_flag(argv, Argv),

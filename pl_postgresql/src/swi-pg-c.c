@@ -62,9 +62,41 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t h
 
 /* macros */
 
-#define PLException(msg,who) { term_t except = PL_new_term_ref();\
-	if (!PL_unify_term(except, PL_FUNCTOR_CHARS, "error", 2, PL_CHARS, msg, PL_CHARS, who)) { return FALSE; }\
-	return PL_raise_exception(except); }
+/* raises error(Formal(Message), context(Name/Arity, _)); who is "Name/Arity".
+ * Trailing white space (libpq/regerror messages end with a newline) is removed. */
+static int raise_error(const char *formal, const char *msg, const char *who)
+{
+	char name[64];
+	char text[1024];
+	const char *slash = strrchr(who, '/');
+	size_t n = slash ? (size_t)(slash - who) : strlen(who);
+	term_t ex = PL_new_term_ref();
+
+	if (n >= sizeof(name)) {
+		n = sizeof(name) - 1;
+	}
+	memcpy(name, who, n);
+	name[n] = '\0';
+	snprintf(text, sizeof(text), "%s", msg);
+	for (n = strlen(text); n > 0 && (text[n-1] == '\n' || text[n-1] == '\r' || text[n-1] == ' '); n--) {
+		text[n-1] = '\0';
+	}
+	msg = text;
+	if (!PL_unify_term(ex,
+	                   PL_FUNCTOR_CHARS, "error", 2,
+	                     PL_FUNCTOR_CHARS, formal, 1,
+	                       PL_CHARS, msg,
+	                     PL_FUNCTOR_CHARS, "context", 2,
+	                       PL_FUNCTOR_CHARS, "/", 2,
+	                         PL_CHARS, name,
+	                         PL_INT, slash ? atoi(slash + 1) : 0,
+	                       PL_VARIABLE)) {
+		return FALSE;
+	}
+	return PL_raise_exception(ex);
+}
+
+#define PLException(formal, msg, who) return raise_error(formal, msg, who)
 
 
 /* Connections
@@ -104,13 +136,11 @@ static int write_pgsql_connection(IOSTREAM *s, atom_t a, int flags)
 
 static PL_blob_t pgsql_connection_blob =
 {
-	PL_BLOB_MAGIC,
-	PL_BLOB_UNIQUE,
-	"pgsql_connection",
-	release_pgsql_connection,
-	NULL,				/* compare */
-	write_pgsql_connection,
-	NULL,				/* acquire */
+	.magic   = PL_BLOB_MAGIC,
+	.flags   = PL_BLOB_UNIQUE,
+	.name    = "pgsql_connection",
+	.release = release_pgsql_connection,
+	.write   = write_pgsql_connection,
 };
 
 /* wraps a freshly opened libpq connection in a blob and unifies it with dbx */
@@ -151,11 +181,11 @@ static int get_open_connection(term_t dbx, pq_connection_encoded **pgconn, const
 	}
 	if (!(*pgconn)->dbx)
 	{
-		PLException("PGSQL: connection closed", (char *)who);
+		return PL_existence_error("pgsql_connection", dbx);	/* disconnected */
 	}
 	if (PQstatus((*pgconn)->dbx) != CONNECTION_OK)
 	{
-		PLException("PGSQL: connection lost", (char *)who);
+		PLException("pgsql_error", "connection lost", (char *)who);
 	}
 	return TRUE;
 }
@@ -194,8 +224,8 @@ foreign_t swi_pgsql_connect1(term_t dbx)
   tenv = getenv("PGHOST");
   if (!tenv)
   {
-    snprintf(errmsg, sizeof(errmsg), "PGSQL: pl_pgsql_connect/1 failed.\nNo environment variable $PGHOST\n");
-    PLException(errmsg,"pl_pgsql_connect/1");
+    snprintf(errmsg, sizeof(errmsg), "environment variable PGHOST is not set");
+    PLException("pgsql_error", errmsg,"pl_pgsql_connect/1");
   }
   hostname = tenv;
 
@@ -212,8 +242,8 @@ foreign_t swi_pgsql_connect1(term_t dbx)
   tenv = getenv("PGDATABASE");
   if (!tenv)
   {
-    snprintf (errmsg, sizeof(errmsg), "PGSQL: pl_pgsql_connect/1 failed.\nNo environment variable $PGDATABASE\n");
-    PLException(errmsg,"pl_pgsql_connect/1");
+    snprintf (errmsg, sizeof(errmsg), "environment variable PGDATABASE is not set");
+    PLException("pgsql_error", errmsg,"pl_pgsql_connect/1");
   }
   dbname = tenv;
 
@@ -228,9 +258,9 @@ foreign_t swi_pgsql_connect1(term_t dbx)
    */
   if (PQstatus(conn) == CONNECTION_BAD)
   {
-    snprintf (errmsg, sizeof(errmsg), "PGSQL: Connection to database %s failed.\n%s", dbname, PQerrorMessage(conn));
+    snprintf (errmsg, sizeof(errmsg), "connection to database %s failed: %s", dbname, PQerrorMessage(conn));
     PQfinish(conn);
-    PLException(errmsg,"pl_pgsql_connect/1");
+    PLException("pgsql_error", errmsg,"pl_pgsql_connect/1");
   }
 
   return unify_connection(dbx, conn);
@@ -276,9 +306,9 @@ foreign_t swi_pgsql_connect2(term_t p_hostname, term_t p_port, term_t p_user, te
    */
   if (PQstatus(conn) == CONNECTION_BAD)
   {
-    snprintf (errmsg, sizeof(errmsg), "PGSQL: Connection to database %s failed.\n%s", dbname, PQerrorMessage(conn));
+    snprintf (errmsg, sizeof(errmsg), "connection to database %s failed: %s", dbname, PQerrorMessage(conn));
     PQfinish(conn);
-    PLException(errmsg,"pl_pgsql_connect/6");
+    PLException("pgsql_error", errmsg,"pl_pgsql_connect/6");
   }
 
   return unify_connection(dbx, conn);
@@ -332,10 +362,10 @@ foreign_t swi_pgsql_disconnect (term_t dbx)
         typereason="unknown Connection type reason.";
         break;
     };
-    snprintf (errmsg, sizeof(errmsg), "PGSQL: connection type: %s", typereason);
+    snprintf (errmsg, sizeof(errmsg), "bad connection status: %s", typereason);
     PQfinish(pgconn->dbx);
     pgconn->dbx = NULL;
-    PLException(errmsg,"pl_pgsql_disconnect/1");
+    PLException("pgsql_error", errmsg,"pl_pgsql_disconnect/1");
   }
   PL_succeed;
 }
@@ -447,15 +477,15 @@ static int exec_query(term_t dbx, term_t query, term_t params, const char *who, 
 
   if (!result)
   {
-    snprintf(errmsg, sizeof(errmsg), "PGSQL: %s", PQerrorMessage(pgconn->dbx));
-    PLException(errmsg, (char *)who);
+    snprintf(errmsg, sizeof(errmsg), "%s", PQerrorMessage(pgconn->dbx));
+    PLException("pgsql_error", errmsg, (char *)who);
   }
   status = PQresultStatus(result);
   if ((status != PGRES_COMMAND_OK) && (status != PGRES_TUPLES_OK))
   {
-    snprintf(errmsg, sizeof(errmsg), "PGSQL: %s -> %s", PQresStatus(status), PQresultErrorMessage(result));
+    snprintf(errmsg, sizeof(errmsg), "%s: %s", PQresStatus(status), PQresultErrorMessage(result));
     PQclear(result);
-    PLException(errmsg, (char *)who);
+    PLException("pgsql_error", errmsg, (char *)who);
   }
   *res = result;
   return TRUE;
@@ -540,7 +570,7 @@ static int query_all(term_t dbx, term_t query, term_t params, term_t out_res, co
 
   if (! PL_is_variable(out_res))
   {
-    PLException("PGSQL: last argument should be variable output!", (char *)who);
+    return PL_uninstantiation_error(out_res);
   }
 
   /* send query and receive result */
@@ -599,7 +629,7 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t h
 
         if (! PL_is_variable(my_res))
         {
-          PLException("PGSQL: last argument should be variable output!", "pl_pgsql_query/3");
+          return PL_uninstantiation_error(my_res);
         }
 
         /* send query and receive result */

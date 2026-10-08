@@ -1,5 +1,5 @@
 /*   Prolog Interface to libcurl (HTTP) -- SWI-Prolog bridge
- *   Copyright (C) 1999-2026  Alexander Diemand
+ *   Copyright (C) 2026  Alexander Diemand
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -33,13 +33,41 @@
 foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
                         term_t p_headers, term_t p_body);
 
-#define PLException(msg, who)                                                         \
-	{                                                                                  \
-		term_t except = PL_new_term_ref();                                            \
-		if (!PL_unify_term(except, PL_FUNCTOR_CHARS, "error", 2, PL_CHARS, msg, PL_CHARS, who)) \
-			return FALSE;                                                             \
-		return PL_raise_exception(except);                                            \
+/* raises error(Formal(Message), context(Name/Arity, _)); who is "Name/Arity".
+ * Trailing white space (libpq/regerror messages end with a newline) is removed. */
+static int raise_error(const char *formal, const char *msg, const char *who)
+{
+	char name[64];
+	char text[1024];
+	const char *slash = strrchr(who, '/');
+	size_t n = slash ? (size_t)(slash - who) : strlen(who);
+	term_t ex = PL_new_term_ref();
+
+	if (n >= sizeof(name)) {
+		n = sizeof(name) - 1;
 	}
+	memcpy(name, who, n);
+	name[n] = '\0';
+	snprintf(text, sizeof(text), "%s", msg);
+	for (n = strlen(text); n > 0 && (text[n-1] == '\n' || text[n-1] == '\r' || text[n-1] == ' '); n--) {
+		text[n-1] = '\0';
+	}
+	msg = text;
+	if (!PL_unify_term(ex,
+	                   PL_FUNCTOR_CHARS, "error", 2,
+	                     PL_FUNCTOR_CHARS, formal, 1,
+	                       PL_CHARS, msg,
+	                     PL_FUNCTOR_CHARS, "context", 2,
+	                       PL_FUNCTOR_CHARS, "/", 2,
+	                         PL_CHARS, name,
+	                         PL_INT, slash ? atoi(slash + 1) : 0,
+	                       PL_VARIABLE)) {
+		return FALSE;
+	}
+	return PL_raise_exception(ex);
+}
+
+#define PLException(formal, msg, who) return raise_error(formal, msg, who)
 
 install_t install()
 {
@@ -99,6 +127,26 @@ static int get_text(swi_curl_strings *st, term_t t, char **out)
 	return 1;
 }
 
+/* body_as(atom|string|codes): the Prolog type of the response body */
+static int get_body_type(term_t t, int *type)
+{
+	char *s;
+
+	if (!PL_get_atom_chars(t, &s)) {
+		return PL_type_error("atom", t);
+	}
+	if (strcmp(s, "atom") == 0) {
+		*type = PL_ATOM;
+	} else if (strcmp(s, "string") == 0) {
+		*type = PL_STRING;
+	} else if (strcmp(s, "codes") == 0) {
+		*type = PL_CODE_LIST;
+	} else {
+		return PL_domain_error("body_as", t);
+	}
+	return 1;
+}
+
 static int get_seconds(term_t t, long *out)
 {
 	if (!PL_get_long(t, out)) {
@@ -121,6 +169,7 @@ foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
 	term_t a2 = PL_new_term_ref();
 	swi_curl_strings st = { NULL, 0, 0 };
 	char *url;
+	int body_type = PL_ATOM;
 
 	memset(&req, 0, sizeof(req));
 	req.follow_redirect = 1;
@@ -196,6 +245,10 @@ foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
 				PL_type_error("integer", a1);
 				goto error;
 			}
+		} else if (arity == 1 && strcmp(fname, "body_as") == 0) {
+			if (!get_body_type(a1, &body_type)) {
+				goto error;
+			}
 		} else if (arity == 1 && strcmp(fname, "follow_redirect") == 0) {
 			req.follow_redirect = swi_curl_bool(a1);
 		} else if (arity == 1 && strcmp(fname, "ssl_verify") == 0) {
@@ -221,7 +274,7 @@ foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
 		char errmsg[512];
 		snprintf(errmsg, sizeof(errmsg), "%s", resp.errbuf);
 		strings_free(&st);
-		PLException(errmsg, "pl_curl_get/5");
+		PLException("curl_error", errmsg, "pl_curl_get/5");
 	}
 	strings_free(&st);
 
@@ -243,7 +296,10 @@ foreign_t swi_curl_get(term_t p_url, term_t p_opts, term_t p_status,
 		ok = ok && PL_unify_nil(hlst);
 
 		ok = ok && PL_unify_integer(p_status, resp.status_code);
-		ok = ok && PL_unify_atom_chars(p_body, resp.body ? resp.body : "");
+		/* explicit length: the body may contain NUL bytes. The bytes are
+		 * taken as ISO Latin-1, i.e. each byte becomes one character */
+		ok = ok && PL_unify_chars(p_body, body_type, resp.body_len,
+		                          resp.body ? resp.body : "");
 
 		pl_curl_response_free(&resp);
 

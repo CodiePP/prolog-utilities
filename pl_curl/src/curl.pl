@@ -5,7 +5,7 @@
 /* Descr.:                                                                 */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2026 Alexander Diemand                               */
+/* Copyright (C) 2026 Alexander Diemand                                    */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -23,7 +23,9 @@
 
 :- module(curl, [ pl_curl_get/5 ]).
 
-curl:init :-
-	load_foreign_library(sbcl('plcurl')).
+:- use_foreign_library(sbcl('plcurl')).
 
-:- initialization(curl:init).
+% error(curl_error(Message), context(Predicate, _)) is raised by the foreign library
+:- multifile prolog:error_message//1.
+prolog:error_message(curl_error(Message)) -->
+	[ 'HTTP request failed: ~w'-[Message] ].

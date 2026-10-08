@@ -5,7 +5,7 @@
 /* Descr.:                                                                 */
 /* Author: Alexander Diemand                                               */
 /*                                                                         */
-/* Copyright (C) 1999-2026 Alexander Diemand                               */
+/* Copyright (C) 2026 Alexander Diemand                                    */
 /*                                                                         */
 /*   This program is free software: you can redistribute it and/or modify  */
 /*   it under the terms of the GNU General Public License as published by  */
@@ -31,4 +31,5 @@ info_curl :- write('Prolog libcurl (HTTP) Interface'),nl,
              write('  Options: param(Name,Value), header(Name,Value),'),nl,
              write('           basic_auth(User,Pass), bearer_auth(Token),'),nl,
              write('           timeout(Secs), connect_timeout(Secs), max_body(Bytes),'),nl,
+             write('           body_as(atom|codes),'),nl,
              write('           follow_redirect(Bool), ssl_verify(Bool), user_agent(Atom)'),nl.

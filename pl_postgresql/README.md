@@ -34,7 +34,10 @@ PREDICATES
 `pl_pgsql_query_all/4 (+connection,+query,+params,-results)`
     like `pl_pgsql_query_all/3`, with placeholders bound to params.
 
-All queries raise `error(Message, Predicate)` if the server reports an error.
+Errors are raised as `error(pgsql_error(Message), context(Predicate, _))`,
+e.g. when the server rejects a query or a connection cannot be made. Using a
+closed connection raises `existence_error(pgsql_connection, Handle)`, passing
+something else as a handle a `type_error(pgsql_connection, Term)`.
 SQL NULL values are returned as `[]`.
 
 
@@ -61,8 +64,8 @@ CONNECTION HANDLES
 ------------------
 
 A connection handle is an opaque blob, printed as `<pgsql_connection>(...)`.
-Using it after `pl_pgsql_disconnect/1` raises an error; anything that is not a
-handle raises a type error. A connection that is never disconnected is closed
+Using it after `pl_pgsql_disconnect/1` raises an existence error; anything
+that is not a handle raises a type error. A connection that is never disconnected is closed
 when its handle is garbage collected, but do not rely on that: always
 disconnect (e.g. with `setup_call_cleanup/3`).
 
@@ -97,7 +100,7 @@ use_module(sbcl(pgsql)).
 ```	
 
 ```
-| ?- pl_pgsql_connect("localhost",5432,"test,"my_password","the_db",DBx),
+| ?- pl_pgsql_connect("localhost",5432,"test","my_password","the_db",DBx),
      run_query(DBx),
      pl_pgsql_disconnect(DBx).
 ```
@@ -131,15 +134,18 @@ also copy the src/pgsql.qlf to this directory
 COMMENTS
 --------
 
-Arguments that are strings are passed as character code lists. Same for strings in the result. Have a look at the code if you want to change this behaviour and get returned atoms for strings.
+Text arguments (queries, parameters, connection settings) may be atoms,
+strings or code lists. In results, `int2`/`int4`/`oid` columns are returned
+as integers, `float4`/`float8`/`money` as floats, SQL NULL as `[]` and
+everything else as SWI-Prolog strings.
 
-On the mips/IRIX there were quite a few problems with gprolog tagged integers. As I pass the pl_pgsql_?? routines the address of the connection structure in C and this address has the 29th bit set the value is a negative number after tagging (left shift of 3 bits). By Un_Tagging this number, the processor thinks it should still be a negative number after right shifting of 3 bits. Hence that does not work. I did something very bad: the address is divided by two (because it anyway is aligned on some even byte boundery) and then passed to gprolog. That helps but is quite a hack.
+There is no GNU Prolog bridge for this module.
 
 
 LICENSE
 -------
 
-Copyright (C) 1999-2023  Alexander Diemand
+Copyright (C) 1999-2026  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

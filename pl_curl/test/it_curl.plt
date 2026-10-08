@@ -1,7 +1,7 @@
 % Integration tests for pl_curl_get/5 against pl_curl/test/http_fixture.pl.
 % Run with ci/it-curl.sh (starts the fixture first). Env: FIXTURE_PORT (18080).
 %
-% Tests marked fixme document known defects (see the repo review); a fixme
+% Tests marked fixme document known defects; a fixme
 % test that starts to pass is reported as fixed, a failing one does not fail
 % the run. Drop the fixme option once the defect is resolved.
 
@@ -83,14 +83,14 @@ test(redirect_not_followed) :-
     header_value(location, Headers, Loc),
     Loc == '/get'.
 
-test(timeout_raises, [throws(error(Msg, 'pl_curl_get/5'))]) :-
+test(timeout_raises, [throws(error(curl_error(Msg), context(pl_curl_get/5, _)))]) :-
     get('/slow', [timeout(1)], _, _, _),
     atom(Msg).
 
-test(connection_refused_raises, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(connection_refused_raises, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     pl_curl_get('http://127.0.0.1:1/', [connect_timeout(2)], _, _, _).
 
-test(bad_url_raises, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(bad_url_raises, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     pl_curl_get('http://no-such-host.invalid/', [connect_timeout(2)], _, _, _).
 
 % --- argument checking ----------------------------------------------
@@ -113,10 +113,10 @@ test(many_params) :-
     echo('/get', Opts, Args, _),
     forall(member(param(K, V), Opts), memberchk(K=V, Args)).
 
-test(header_crlf_rejected, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(header_crlf_rejected, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     get('/get', [header('X-Test', 'a\r\nX-Other: injected')], _, _, _).
 
-test(bearer_crlf_rejected, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(bearer_crlf_rejected, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     get('/get', [bearer_auth('tok\r\nX-Other: injected')], _, _, _).
 
 test(long_bearer_token) :-
@@ -127,26 +127,68 @@ test(long_bearer_token) :-
 
 % --- limits ------------------------------------------------------------
 
-test(redirect_limit, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(redirect_limit, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     get('/loop', [], _, _, _).
 
 test(body_within_limit) :-
     get('/big', [max_body(100000)], 200, _, Body),
     atom_length(Body, 100000).
 
-test(body_over_limit, [throws(error(Msg, 'pl_curl_get/5'))]) :-
+test(body_over_limit, [throws(error(curl_error(Msg), context(pl_curl_get/5, _)))]) :-
     get('/big', [max_body(1000)], _, _, _),
     atom(Msg).
 
-test(file_scheme_refused, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(file_scheme_refused, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     tmp_file(plu, F),
     setup_call_cleanup(( open(F, write, S), write(S, secret), close(S) ),
                        ( atom_concat('file://', F, URL),
                          pl_curl_get(URL, [], _, _, _) ),
                        delete_file(F)).
 
-test(redirect_to_file_refused, [throws(error(_, 'pl_curl_get/5'))]) :-
+test(redirect_to_file_refused, [throws(error(curl_error(_), context(pl_curl_get/5, _)))]) :-
     get('/file', [], _, _, _).
+
+% --- body type ---------------------------------------------------------
+
+test(body_is_atom_by_default) :-
+    get('/conn', [], 200, _, Body),
+    atom(Body).
+
+test(body_as_string) :-
+    get('/get', [body_as(string)], 200, _, Body),
+    string(Body),
+    sub_string(Body, _, _, _, "\"args\""), !.
+
+test(body_as_codes_keeps_nul) :-
+    get('/binary', [body_as(codes)], 200, _, Body),
+    Body == [97, 0, 98, 255].
+
+test(body_as_atom_keeps_nul) :-
+    get('/binary', [], 200, _, Body),
+    atom_codes(Body, [97, 0, 98, 255]).
+
+test(body_as_invalid, [throws(error(domain_error(body_as, json), _))]) :-
+    get('/get', [body_as(json)], _, _, _).
+
+% --- keep-alive ----------------------------------------------------------
+
+test(connection_reused) :-
+    get('/conn', [], 200, _, C1),
+    get('/conn', [], 200, _, C2),
+    get('/get', [param(a, b)], 200, _, _),
+    get('/conn', [], 200, _, C3),
+    C1 == C2, C2 == C3.
+
+% each thread has its own handle (libcurl handles must not be shared between
+% concurrent threads); it is cleaned up when the thread ends
+test(threads_use_own_connections) :-
+    get('/conn', [], 200, _, Main),
+    numlist(1, 4, Ns),
+    maplist([_, T]>>thread_create(( get('/conn', [], 200, _, Id), Id \== Main ), T, []),
+            Ns, Ts),
+    maplist([T]>>thread_join(T, true), Ts),
+    get('/conn', [], 200, _, Main2),
+    Main2 == Main.
 
 % --- known defects ----------------------------------------------------
 
@@ -154,5 +196,11 @@ test(utf8_body_decoded, [fixme('body is returned as a Latin-1 atom; should be UT
     get('/utf8', [], 200, _, Body),
     atom_codes(Expected, [0'G, 0'r, 252, 223, 0'e, 0' , 128512]),
     Body == Expected.
+
+test(error_message_is_readable) :-
+    catch(pl_curl_get('http://127.0.0.1:1/', [connect_timeout(2)], _, _, _), E, true),
+    '$messages':translate_message(E, Lines, []),
+    with_output_to(string(Msg), print_message_lines(current_output, '', Lines)),
+    once(sub_string(Msg, _, _, _, "pl_curl_get/5: HTTP request failed: ")).
 
 :- end_tests(curl_it).

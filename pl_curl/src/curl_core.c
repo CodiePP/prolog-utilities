@@ -1,5 +1,5 @@
 /*   Prolog Interface to libcurl (HTTP)
- *   Copyright (C) 1999-2026  Alexander Diemand
+ *   Copyright (C) 2026  Alexander Diemand
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "curl_core.h"
 
@@ -174,6 +175,55 @@ static char *build_url_with_params(CURL *curl, const pl_curl_request *req)
   return url.data;
 }
 
+/* Keep-alive: every thread keeps one easy handle and reuses it for its
+ * requests, so libcurl can reuse open connections (and its DNS and TLS
+ * session caches). A handle is never used by two threads at once, which
+ * libcurl requires; it is cleaned up when its thread ends. */
+static pthread_key_t handle_key;
+static pthread_once_t handle_once = PTHREAD_ONCE_INIT;
+static int handle_key_ok = 0;
+
+static void handle_free(void *h)
+{
+  curl_easy_cleanup((CURL *)h);
+}
+
+static void handle_key_init(void)
+{
+  handle_key_ok = pthread_key_create(&handle_key, handle_free) == 0;
+}
+
+/* this thread's handle (*cached = 1) or, if it cannot be kept, a new one
+ * that the caller must clean up (*cached = 0) */
+static CURL *thread_handle(int *cached)
+{
+  CURL *curl;
+
+  *cached = 0;
+  pthread_once(&handle_once, handle_key_init);
+  if (handle_key_ok && (curl = (CURL *)pthread_getspecific(handle_key)) != NULL) {
+    *cached = 1;
+    return curl;
+  }
+  curl = curl_easy_init();
+  if (curl && handle_key_ok && pthread_setspecific(handle_key, curl) == 0) {
+    *cached = 1;
+  }
+  return curl;
+}
+
+/* after a request: a cached handle is reset (all options back to their
+ * defaults, so no pointer to this request's data remains, but the
+ * connections stay open); any other handle is cleaned up */
+static void release_handle(CURL *curl, int cached)
+{
+  if (cached) {
+    curl_easy_reset(curl);
+  } else {
+    curl_easy_cleanup(curl);
+  }
+}
+
 void pl_curl_global_init(void)
 {
   curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -229,6 +279,7 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
   long connect_timeout = req->connect_timeout_sec > 0 ? req->connect_timeout_sec
                                                       : PL_CURL_DEFAULT_CONNECT_TIMEOUT;
   long max_body = req->max_body > 0 ? req->max_body : PL_CURL_DEFAULT_MAX_BODY;
+  int cached;
   int i;
 
   memset(resp, 0, sizeof(*resp));
@@ -253,7 +304,7 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
     return 0;
   }
 
-  curl = curl_easy_init();
+  curl = thread_handle(&cached);
   if (!curl) {
     snprintf(resp->errbuf, sizeof(resp->errbuf), "curl_easy_init failed");
     return 0;
@@ -262,7 +313,7 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
   full_url = build_url_with_params(curl, req);
   if (!full_url) {
     snprintf(resp->errbuf, sizeof(resp->errbuf), "out of memory building URL");
-    curl_easy_cleanup(curl);
+    release_handle(curl, cached);
     return 0;
   }
 
@@ -352,10 +403,10 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
   }
 
 done:
+  release_handle(curl, cached);   /* before freeing what its options point to */
   if (slist) {
     curl_slist_free_all(slist);
   }
-  curl_easy_cleanup(curl);
   free(full_url);
   free(body.data);
   for (i = 0; i < hacc.n_headers; i++) {

@@ -25,16 +25,22 @@ pl_curl_get(+URL, +Options, -Status, -Headers, -Body)
   | `timeout(Seconds)`           | total request timeout, default 300                    |
   | `connect_timeout(Seconds)`   | connection-phase timeout, default 30                  |
   | `max_body(Bytes)`            | maximum response body size, default 64 MiB            |
+  | `body_as(Type)`              | type of `Body`: `atom` (default), `string` (SWI-Prolog only) or `codes` |
   | `follow_redirect(Bool)`      | follow `Location` redirects, default `true`           |
   | `ssl_verify(Bool)`           | verify the TLS certificate/host, default `true`       |
   | `user_agent(Atom)`           | custom `User-Agent` header                            |
 
 * `Status` — unifies with the HTTP status code (integer).
 * `Headers` — unifies with a list of `Name-Value` pairs (response headers, in order received).
-* `Body` — unifies with the response body.
+* `Body` — unifies with the response body: each byte becomes one character
+  (ISO Latin-1, no charset decoding). `body_as(string)` avoids putting large
+  bodies into the atom table; `body_as(codes)` gives a list of byte values.
+  With GNU Prolog an atom body ends at the first NUL byte, so use
+  `body_as(codes)` for binary data.
 
 A transport-level failure (DNS, connection refused, TLS handshake, timeout, ...)
-throws a Prolog exception. An HTTP error status (404, 500, ...) is *not* an
+throws `error(curl_error(Message), context(pl_curl_get/5, _))`, where Message
+is libcurl's description of the problem. An HTTP error status (404, 500, ...) is *not* an
 exception — it is returned in `Status` like any other response, so the caller
 decides how to handle it.
 
@@ -53,6 +59,10 @@ LIMITS AND SAFETY
   `connect_timeout(Seconds)`, default 30 s). A value of 0 selects the default.
 * A response body larger than `max_body(Bytes)` (default 64 MiB) aborts the
   request with an exception, so a hostile server cannot exhaust memory.
+* Connections are kept open and reused (HTTP keep-alive): each Prolog
+  thread keeps one libcurl handle, so repeated requests to the same server
+  skip the TCP and TLS handshakes. The handle and its connections are
+  released when the thread ends.
 * Header names/values, credentials and the user agent must not contain CR or
   LF (that would allow injecting extra request headers); such a request
   raises an exception before anything is sent.
@@ -111,7 +121,7 @@ GNU PROLOG top
 ---------------
 
 ```
-gplc -o test-gp --new-top-level src/top-curl.pl libplcurl-$(uname -s).a -L -lcurl
+gplc -o test-gp --new-top-level src/top-curl.pl libplcurl-$(uname -s).a -L '-lcurl -pthread'
 ```
 
 or simply `make top`.
@@ -132,7 +142,7 @@ to `curl_core.c` once.
 LICENSE
 -------
 
-Copyright (C) 1999-2026  Alexander Diemand
+Copyright (C) 2026  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

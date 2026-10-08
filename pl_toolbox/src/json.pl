@@ -58,7 +58,7 @@ from_json(Input, Json) :-
 %   inverse of from_json/2; Atom holds the compact JSON text.
 
 to_json(Json, Atom) :-
-        encode_value(Json, Codes),
+        phrase(encode_value(Json), Codes),
         atom_codes(Atom, Codes).
 
 json_from_file(Filename, Json) :-
@@ -103,21 +103,25 @@ value(false) --> "false", !.
 value(null) --> "null", !.
 value(N) --> number_val(N).
 
+% members and elements are parsed deterministically: each value is parsed
+% once and the next character decides between "," and the closing bracket.
+% (Alternative clauses for one and for several values parsed the value
+% again on backtracking, which doubled the work per nesting level.)
 object(json([])) --> "{", ws, "}", !.
-object(json(Pairs)) --> "{", ws, members(Pairs), ws, "}".
+object(json([Pair|Rest])) --> "{", ws, pair(Pair), ws, members(Rest), "}".
 
-members([Pair]) --> pair(Pair).
-members([Pair|Rest]) --> pair(Pair), ws, ",", ws, members(Rest).
+members([Pair|Rest]) --> ",", !, ws, pair(Pair), ws, members(Rest).
+members([]) --> [].
 
 pair(Name=Value) -->
         jstring(NameCodes), { atom_codes(Name, NameCodes) },
         ws, ":", ws, value(Value).
 
 array([]) --> "[", ws, "]", !.
-array(List) --> "[", ws, elements(List), ws, "]".
+array([V|Rest]) --> "[", ws, value(V), ws, elements(Rest), "]".
 
-elements([V]) --> value(V).
-elements([V|Rest]) --> value(V), ws, ",", ws, elements(Rest).
+elements([V|Rest]) --> ",", !, ws, value(V), ws, elements(Rest).
+elements([]) --> [].
 
 jstring(Codes) --> "\"", jchars(Codes), "\"".
 
@@ -220,50 +224,40 @@ ws_char(0' ). ws_char(9). ws_char(10). ws_char(13).
 /* encode                                                                */
 /* -------------------------------------------------------------------- */
 
-encode_value(json(Pairs), Codes) :- !, encode_object(Pairs, Codes).
-encode_value(List, Codes) :- is_list(List), !, encode_array(List, Codes).
-encode_value(true, Codes) :- !, Codes = "true".
-encode_value(false, Codes) :- !, Codes = "false".
-encode_value(null, Codes) :- !, Codes = "null".
-encode_value(N, Codes) :- number(N), !, number_codes(N, Codes).
-encode_value(A, Codes) :- atom(A), !, encode_string(A, Codes).
+% a grammar producing the codes: every part is written once into the
+% output list (no append/3 of intermediate lists)
 
-encode_object([], Codes) :- !, Codes = "{}".
-encode_object(Pairs, Codes) :-
-        encode_members(Pairs, Inner),
-        append([0'{], Inner, T), append(T, [0'}], Codes).
+encode_value(json(Pairs)) --> !, "{", encode_members(Pairs), "}".
+encode_value(List) --> { is_list(List) }, !, "[", encode_elements(List), "]".
+encode_value(true) --> !, "true".
+encode_value(false) --> !, "false".
+encode_value(null) --> !, "null".
+encode_value(N) --> { number(N) }, !, { number_codes(N, Codes) }, json_codes(Codes).
+encode_value(A) --> { atom(A) }, !, encode_string(A).
 
-encode_members([Name=Value], Codes) :- !,
-        encode_string(Name, NC),
-        encode_value(Value, VC),
-        append(NC, [0':], T), append(T, VC, Codes).
-encode_members([Name=Value|Rest], Codes) :-
-        encode_string(Name, NC),
-        encode_value(Value, VC),
-        encode_members(Rest, RC),
-        append(NC, [0':], T1), append(T1, VC, T2), append(T2, [0',], T3), append(T3, RC, Codes).
+encode_members([]) --> [].
+encode_members([Pair|Rest]) --> encode_member(Pair), encode_members_rest(Rest).
 
-encode_array([], Codes) :- !, Codes = "[]".
-encode_array(List, Codes) :-
-        encode_elements(List, Inner),
-        append([0'[], Inner, T), append(T, [0']], Codes).
+encode_members_rest([]) --> [].
+encode_members_rest([Pair|Rest]) --> ",", encode_member(Pair), encode_members_rest(Rest).
 
-encode_elements([V], Codes) :- !, encode_value(V, Codes).
-encode_elements([V|Vs], Codes) :-
-        encode_value(V, VC),
-        encode_elements(Vs, RC),
-        append(VC, [0',], T), append(T, RC, Codes).
+encode_member(Name=Value) --> encode_string(Name), ":", encode_value(Value).
 
-encode_string(Atom, Codes) :-
-        atom_codes(Atom, Chars),
-        escape_chars(Chars, Escaped),
-        append([0'"], Escaped, T), append(T, [0'"], Codes).
+encode_elements([]) --> [].
+encode_elements([V|Vs]) --> encode_value(V), encode_elements_rest(Vs).
 
-escape_chars([], []).
-escape_chars([C|Cs], Out) :-
-        escape_char(C, EC),
-        escape_chars(Cs, Rest),
-        append(EC, Rest, Out).
+encode_elements_rest([]) --> [].
+encode_elements_rest([V|Vs]) --> ",", encode_value(V), encode_elements_rest(Vs).
+
+encode_string(Atom) -->
+        { atom_codes(Atom, Chars) },
+        "\"", escape_chars(Chars), "\"".
+
+escape_chars([]) --> [].
+escape_chars([C|Cs]) --> { escape_char(C, EC) }, json_codes(EC), escape_chars(Cs).
+
+json_codes([]) --> [].
+json_codes([C|Cs]) --> [C], json_codes(Cs).
 
 escape_char(0'", [0'\\,0'"]) :- !.
 escape_char(0'\\, [0'\\,0'\\]) :- !.

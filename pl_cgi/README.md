@@ -1,6 +1,26 @@
 Prolog CGI programming
 ======================
 
+Write CGI programs (scripts run by a web server for each request) in
+SWI-Prolog or GNU Prolog: `init_cgi` parses the request parameters and
+cookies, `generate_html_output/1,2,3` writes the response headers and fills
+an HTML template. Needs `pl_regexp` and `pl_toolbox`.
+
+Quickstart (SWI-Prolog, see `test/` for a complete example):
+
+```prolog
+:- use_module(sbcl(cgi)).
+
+run :-
+    init_cgi,                                  % parse QUERY_STRING / POST body
+    generate_html_output('hello.html'),        % headers + template, uses cgi_in/2
+    halt.
+```
+
+with `hello.html` containing `<h1>Hello @name@</h1>`. Then
+`REQUEST_METHOD=GET QUERY_STRING='name=World' swipl -g run -t halt hello.pl`
+prints the page with `Hello World`.
+
 After `init_cgi` you can set the variable cgi_env(plContentType,'text/html'), 
 which controls what content type for the document is being used, to something
 different.
@@ -42,7 +62,19 @@ output, replacing
   scripts into the page.
 * `@!name@` likewise, but **without** escaping. Only use it for values the
   application controls, never for request parameters or cookies.
-* `{Goal}` with whatever `Goal` writes. The goal's output is not escaped.
+* `{Goal}` with whatever `Goal` writes; `Goal` is read as Prolog term up
+  to the next `}` and called once (a failing goal writes nothing more).
+  The goal's output is **not** escaped: use `write_html_escaped/1` for
+  anything that comes from the request, e.g.
+  `{cgi_in(A,B),write(A),write(': '),write_html_escaped(B),nl,fail.}`.
+* `\{` with a literal `{` (other `\` are copied unchanged).
+
+A literal `@` (e.g. in an e-mail address) starts a tag and is dropped, so write
+addresses in templates as `{write('me@example.org')}` or `&#64;`.
+
+`generate_html_output(Predlist, File, [no_HTML_header])` writes only the
+template, without response headers. Templates are trusted program code (they
+can call any goal); never use a template path that comes from the request.
 
 Headers
 -------

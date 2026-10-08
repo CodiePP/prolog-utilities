@@ -31,7 +31,7 @@ info_math :- write('Prolog Toolbox, Mathematical Functors'),nl,
 % Constants
 
                             %                           %
-info_math_const_1 :- write('pi(X)                       X is 3.14169....'),nl,
+info_math_const_1 :- write('pi(X)                       X is 3.14159....'),nl,
                      write('e(X)                        X is 2.71828....'),nl.
 
 pi(3.14159265358979323846).
@@ -50,7 +50,7 @@ det([[A1,A2],[B1,B2]],Det) :- Det is A1*B2-A2*B1.
 % Converts radiants to degrees
 
                           %                           %
-info_rad2grad_2 :- write('rad2grad(R,G)               G=R/180*PI'),nl.
+info_rad2grad_2 :- write('rad2grad(R,G)               G=R*180/PI'),nl.
 
 rad2grad(R,G) :- ( var(R) -> 
                         grad2rad(G,R)
@@ -62,7 +62,7 @@ rad2grad(R,G) :- ( var(R) ->
 % Converts degrees to radiants
 
                           %                           %
-info_grad2rad_2 :- write('grad2rad(G,R)               R=G*180/PI'),nl.
+info_grad2rad_2 :- write('grad2rad(G,R)               R=G*PI/180'),nl.
 
 grad2rad(G,R) :- ( var(G) -> 
                         rad2grad(R,G)

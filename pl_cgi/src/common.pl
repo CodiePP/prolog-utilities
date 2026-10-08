@@ -48,7 +48,7 @@ init_cgi :-
 % read_cgi_input(-Codes)
 % the raw request parameters: QUERY_STRING for method GET, otherwise
 % CONTENT_LENGTH bytes (or everything up to end of file) from stdin.
-% Throws error(resource_error(cgi_input_length(Max)),init_cgi/0) if the
+% Throws error(resource_error(cgi_input_length(Max)),_) if the
 % input is longer than max_input_length/1.
 read_cgi_input(Codes) :-
         max_input_length(Max),
@@ -76,7 +76,7 @@ max_input_length(1048576).
 
 check_input_length(N,Max) :- N =< Max, !.
 check_input_length(_,Max) :-
-        throw(error(resource_error(cgi_input_length(Max)),init_cgi/0)).
+        throw(error(resource_error(cgi_input_length(Max)),context(init_cgi/0,_))).
 
 % read_n_codes(+N,-Codes)
 % reads at most N codes from the current input
@@ -136,12 +136,8 @@ read_cookies_aux(String) :-
         read_cookies_aux2(Match).
 
 read_cookies_aux2([]) :- !.
-read_cookies_aux2([_,B,C0,D0|_]) :-
+read_cookies_aux2([_,B,C,D|_]) :-   % pl_regexp/3 returns atoms
         %write(C),write('-->'),write(D),nl,
-        %string_to_atom(C0,C),
-        %string_to_atom(D0,D),
-        atom_codes(C,C0),
-        atom_codes(D,D0),
         X =.. ['cgi_cookies',C,D],
         asserta(X),
         read_cookies_aux(B).
