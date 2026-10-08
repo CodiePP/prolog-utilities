@@ -1,5 +1,5 @@
 /*   Prolog Toolbox
- *   Copyright (C) 1999-2020  Alexander Diemand
+ *   Copyright (C) 1999-2026  Alexander Diemand
  * 
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,10 +17,19 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "SWI-Prolog.h"
+
+#if PLVERSION < 80000
+#error "needs SWI-Prolog >= 8.0"
+#endif
 
 
 foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname);
@@ -37,11 +46,12 @@ install_t install()
 
 foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname)
 {
-	char    sdir[256];
+	char    path[PATH_MAX];
 	char    prefix[6];
 	char	*s;
-	int	dlen,plen;
-	char    *realname;
+	size_t	dlen,plen;
+	struct stat st;
+	int	fd;
 
 	if (! PL_is_variable(fname))
 	{
@@ -59,32 +69,53 @@ foreign_t swi_temporary_file(term_t dir, term_t pfx, term_t fname)
 		PL_fail;
 	}
 
-	PL_get_atom_nchars(dir, &dlen, &s);
-	if (dlen > 245)
+	if (!PL_get_atom_nchars(pfx, &plen, &s))
+	{
+		PL_fail;
+	}
+	if (plen > 5)
+	{
+		plen = 5;
+	}
+	memcpy(prefix,s,plen);
+	prefix[plen]='\0';
+	if (strlen(prefix) != plen || strchr(prefix,'/'))
+	{
+		printf("  Error: prefix must not contain '/' or NUL.\n");
+		PL_fail;
+	}
+
+	if (!PL_get_atom_nchars(dir, &dlen, &s))
+	{
+		PL_fail;
+	}
+	if (dlen == 0 || strlen(s) != dlen)
+	{
+		printf("  Error: invalid directory path.\n");
+		PL_fail;
+	}
+	if (stat(s, &st) != 0 || !S_ISDIR(st.st_mode))
+	{
+		printf("  Error: %s is not a directory.\n", s);
+		PL_fail;
+	}
+
+	/* <dir>/<prefix>XXXXXX; mkstemp creates the file exclusively (O_EXCL,
+	 * mode 0600), so it can neither follow a planted symlink nor open a file
+	 * created by someone else in a shared directory such as /tmp */
+	if (snprintf(path, sizeof(path), "%s%s%sXXXXXX", s,
+	             s[dlen-1] == '/' ? "" : "/", prefix) >= (int)sizeof(path))
 	{
 		printf("  Error: directory path too long.\n");
 		PL_fail;
 	}
-	strncpy(sdir,s,dlen);
-	sdir[dlen]='\0';
-	PL_get_atom_nchars(pfx, &plen, &s);
-	strncpy(prefix,s,5);
-	prefix[5]='\0';
 
-	realname = tempnam(sdir,prefix);
-	if (realname)
+	fd = mkstemp(path);
+	if (fd < 0)
 	{
-		FILE *fstr = fopen(realname,"w");
-		if (fstr)
-		{
-			fclose(fstr);
-			int ret = PL_unify_atom_chars(fname, realname);	// unify and succeed
-			free(realname);
-			return ret;
-		}
-		printf("  Error: No temporary name generated.\n");
+		printf("  Error: cannot create temporary file in %s: %s\n", s, strerror(errno));
+		PL_fail;
 	}
-	printf("  Error: unspecific.\n");
-	PL_fail;
+	close(fd);
+	return PL_unify_atom_chars(fname, path);	// unify and succeed
 }
-

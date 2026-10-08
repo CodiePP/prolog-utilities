@@ -29,6 +29,23 @@ no
 ```
 
 
+SECURITY: TRUSTED PATTERNS ONLY
+-------------------------------
+
+`pl_regexp/3` hands the pattern to the C library's POSIX `regcomp`/`regexec`
+as is, and compiles it again on every call. There is no time or size limit:
+some patterns (nested repetition such as `(a*)*b`, large bounded repeats such
+as `(a{1,255}){1,255}`, back-references) can make matching take a very long
+time or use a lot of memory, depending on the C library. A program that lets
+users supply patterns can therefore be blocked (denial of service).
+
+* Only use patterns that are part of your program (or otherwise trusted).
+* Never build a pattern from request parameters, cookies or other user input;
+  if you must match user input against a user-chosen text, use a plain
+  substring search (e.g. `sub_atom/5`) instead.
+* The subject string may come from users, but limit its length.
+
+
 HOW TO COMPILE
 --------------
 
@@ -55,7 +72,7 @@ gplc -o test-gp --new-top-level src/top-regexp.pl  libplregexp-Linux.a
 LICENSE
 -------
 
-Copyright (C) 1999-2023  Alexander Diemand
+Copyright (C) 1999-2026  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

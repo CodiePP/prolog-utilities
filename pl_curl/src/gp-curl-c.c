@@ -20,6 +20,10 @@
 #include <string.h>
 
 #include "gprolog.h"
+
+#if !defined(__GPROLOG_VERSION__) || __GPROLOG_VERSION__ < 10400
+#error "needs GNU Prolog >= 1.4.0"
+#endif
 #include "curl_core.h"
 
 /* pl_curl_get(+URL, +Options, -Status, -Headers, -Body)
@@ -29,8 +33,9 @@
  *   header(Name, Value)         extra request header
  *   basic_auth(User, Pass)      HTTP Basic authentication
  *   bearer_auth(Token)          Authorization: Bearer <Token>
- *   timeout(Seconds)            total request timeout
- *   connect_timeout(Seconds)    connect-phase timeout
+ *   timeout(Seconds)            total request timeout, default 300
+ *   connect_timeout(Seconds)    connect-phase timeout, default 30
+ *   max_body(Bytes)             max. response body size, default 64 MiB
  *   follow_redirect(Bool)       true/false, default true
  *   ssl_verify(Bool)            true/false, default true
  *   user_agent(Atom)
@@ -86,6 +91,8 @@ PlBool pl_curl_get(PlTerm p_url, PlTerm p_opts, PlTerm p_status, PlTerm p_header
       req.timeout_sec = (long)Pl_Rd_Integer_Check(args[0]);
     } else if (args && arity == 1 && strcmp(name, "connect_timeout") == 0) {
       req.connect_timeout_sec = (long)Pl_Rd_Integer_Check(args[0]);
+    } else if (args && arity == 1 && strcmp(name, "max_body") == 0) {
+      req.max_body = (long)Pl_Rd_Integer_Check(args[0]);
     } else if (args && arity == 1 && strcmp(name, "follow_redirect") == 0) {
       req.follow_redirect = gp_curl_bool(args[0]);
     } else if (args && arity == 1 && strcmp(name, "ssl_verify") == 0) {

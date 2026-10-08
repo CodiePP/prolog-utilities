@@ -7,10 +7,13 @@ PREDICATES
 
 `pl_pgsql_connect/6 (+host,+port,+user,+password,+dbname,-connection)`
     connect to the server on host as user with password, returns the 
-    connection id, which must be used in further request.
+    connection handle, which must be used in further request.
+
+`pl_pgsql_connect/1 (-connection)`
+    connect using the environment variables PGHOST, PGPORT and PGDATABASE.
 
 `pl_pgsql_disconnect/1 (+connection)`
-    disconnect and **free** allocated memory
+    close the connection. Fails if the connection is already closed.
 
 `pl_pgsql_query/2 (+connection,+query)`
     sends the query to the server. There is no result.
@@ -23,6 +26,45 @@ PREDICATES
 `pl_pgsql_query_all/3 (+connection,+query,-results)`
     sends the query to the server. This predicate is deterministic and collects
     all rows from the result set of the query.
+
+`pl_pgsql_exec/3 (+connection,+query,+params)`
+    like `pl_pgsql_query/2`, but the query may contain the placeholders
+    `$1`, `$2`, ... which are bound to the values in the list params.
+
+`pl_pgsql_query_all/4 (+connection,+query,+params,-results)`
+    like `pl_pgsql_query_all/3`, with placeholders bound to params.
+
+All queries raise `error(Message, Predicate)` if the server reports an error.
+SQL NULL values are returned as `[]`.
+
+
+PARAMETERISED QUERIES
+---------------------
+
+Never build SQL by concatenating values that come from users: use
+`pl_pgsql_exec/3` or `pl_pgsql_query_all/4` instead. The values are sent
+separately from the query text (libpq `PQexecParams`), so they cannot change
+the meaning of the statement.
+
+A parameter is an atom, string, number or code list; `[]` is sent as SQL
+NULL (so an empty string must be passed as `''` or `""`, not as an empty code
+list). The server infers the parameter types from the query; add a cast
+(`$1::int`) where it cannot.
+
+```
+| ?- pl_pgsql_exec(DBx, "insert into addresses (nr, name) values ($1, $2)", [42, "O'Brien"]),
+     pl_pgsql_query_all(DBx, "select name from addresses where nr = $1", [42], Rows).
+```
+
+
+CONNECTION HANDLES
+------------------
+
+A connection handle is an opaque blob, printed as `<pgsql_connection>(...)`.
+Using it after `pl_pgsql_disconnect/1` raises an error; anything that is not a
+handle raises a type error. A connection that is never disconnected is closed
+when its handle is garbage collected, but do not rely on that: always
+disconnect (e.g. with `setup_call_cleanup/3`).
 
 
 EXAMPLES
@@ -65,8 +107,9 @@ HOW TO COMPILE
 --------------
 
 ```sh
-aclocal --force && autoheader --force && autoconf --force
+autoreconf -fi
 ```
+(needs autoconf >= 2.70, which also installs the helper scripts in `config/`)
 then run
 ```sh
 ./configure

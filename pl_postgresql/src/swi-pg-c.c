@@ -1,5 +1,5 @@
 /*   SWI-Prolog Interface to Postgresql
- *   Copyright (C) 1999-2020  Alexander Diemand
+ *   Copyright (C) 1999-2026  Alexander Diemand
  * 
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,10 +17,24 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
+#include <SWI-Stream.h>
 #include <SWI-Prolog.h>
+
+#if PLVERSION < 80000
+#error "needs SWI-Prolog >= 8.0"
+#endif
+
+/* older names of BUF_STACK (< 8.5) and PL_PRUNED (< 8.3) */
+#ifndef BUF_STACK
+#define BUF_STACK BUF_RING
+#endif
+#ifndef PL_PRUNED
+#define PL_PRUNED PL_CUTTED
+#endif
 #include <libpq-fe.h>
 
 
@@ -40,15 +54,111 @@ foreign_t swi_pgsql_connect1(term_t dbx);
 foreign_t swi_pgsql_connect2(term_t host, term_t port, term_t user, term_t passwd, term_t dbname, term_t dbx);
 foreign_t swi_pgsql_disconnect (term_t dbx);
 foreign_t swi_pgsql_query1 (term_t dbx, term_t query);
+foreign_t swi_pgsql_exec (term_t dbx, term_t query, term_t params);
 foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t list);
-foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t handle);
+foreign_t swi_pgsql_query_all_params (term_t dbx, term_t query, term_t params, term_t list);
+foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t handle);
 
 
 /* macros */
 
 #define PLException(msg,who) { term_t except = PL_new_term_ref();\
-	PL_unify_term(except, PL_FUNCTOR_CHARS, "error", 2, PL_CHARS, msg, PL_CHARS, who);\
+	if (!PL_unify_term(except, PL_FUNCTOR_CHARS, "error", 2, PL_CHARS, msg, PL_CHARS, who)) { return FALSE; }\
 	return PL_raise_exception(except); }
+
+
+/* Connections
+ *
+ * A connection is handed to Prolog as a blob of type pgsql_connection that
+ * holds a pointer to a pq_connection_encoded. pl_pgsql_disconnect/1 closes
+ * the libpq connection and sets dbx to NULL, but the structure itself is only
+ * freed when the blob is garbage collected. A handle used after disconnect is
+ * therefore detected instead of dereferencing freed memory, and arbitrary
+ * terms (e.g. integers) are rejected as handles.
+ */
+
+typedef struct {
+	PGconn *dbx;		/* NULL once disconnected */
+} pq_connection_encoded;
+
+static int release_pgsql_connection(atom_t a)
+{
+	pq_connection_encoded *pgconn = *(pq_connection_encoded **)PL_blob_data(a, NULL, NULL);
+
+	if (pgconn->dbx)
+	{
+		PQfinish(pgconn->dbx);
+	}
+	free(pgconn);
+	return TRUE;
+}
+
+static int write_pgsql_connection(IOSTREAM *s, atom_t a, int flags)
+{
+	pq_connection_encoded *pgconn = *(pq_connection_encoded **)PL_blob_data(a, NULL, NULL);
+
+	(void)flags;
+	Sfprintf(s, "<pgsql_connection>(%p%s)", (void *)pgconn, pgconn->dbx ? "" : ",closed");
+	return TRUE;
+}
+
+static PL_blob_t pgsql_connection_blob =
+{
+	PL_BLOB_MAGIC,
+	PL_BLOB_UNIQUE,
+	"pgsql_connection",
+	release_pgsql_connection,
+	NULL,				/* compare */
+	write_pgsql_connection,
+	NULL,				/* acquire */
+};
+
+/* wraps a freshly opened libpq connection in a blob and unifies it with dbx */
+static int unify_connection(term_t dbx, PGconn *conn)
+{
+	pq_connection_encoded *pgconn = malloc(sizeof(pq_connection_encoded));
+
+	if (!pgconn)
+	{
+		PQfinish(conn);
+		return PL_resource_error("memory");
+	}
+	pgconn->dbx = conn;
+	/* if unification fails, garbage collection of the blob closes the connection */
+	return PL_unify_blob(dbx, &pgconn, sizeof(pgconn), &pgsql_connection_blob);
+}
+
+/* returns TRUE and sets pgconn if dbx is a connection handle (open or closed) */
+static int get_connection(term_t dbx, pq_connection_encoded **pgconn)
+{
+	void *data;
+	PL_blob_t *type;
+
+	if (!PL_get_blob(dbx, &data, NULL, &type) || type != &pgsql_connection_blob)
+	{
+		return FALSE;
+	}
+	*pgconn = *(pq_connection_encoded **)data;
+	return TRUE;
+}
+
+/* like get_connection/2, but raises an exception unless dbx is an open connection */
+static int get_open_connection(term_t dbx, pq_connection_encoded **pgconn, const char *who)
+{
+	if (!get_connection(dbx, pgconn))
+	{
+		return PL_type_error("pgsql_connection", dbx);
+	}
+	if (!(*pgconn)->dbx)
+	{
+		PLException("PGSQL: connection closed", (char *)who);
+	}
+	if (PQstatus((*pgconn)->dbx) != CONNECTION_OK)
+	{
+		PLException("PGSQL: connection lost", (char *)who);
+	}
+	return TRUE;
+}
 
 
 /* Implementation */
@@ -59,23 +169,21 @@ install_t install()
 	PL_register_foreign("pl_pgsql_connect", 6, swi_pgsql_connect2, 0);
 	PL_register_foreign("pl_pgsql_disconnect", 1, swi_pgsql_disconnect, 0);
 	PL_register_foreign("pl_pgsql_query", 2, swi_pgsql_query1, 0);
+	PL_register_foreign("pl_pgsql_exec", 3, swi_pgsql_exec, 0);
 	PL_register_foreign("pl_pgsql_query_all", 3, swi_pgsql_query_all, 0);
+	PL_register_foreign("pl_pgsql_query_all", 4, swi_pgsql_query_all_params, 0);
 	PL_register_foreign("pl_pgsql_query", 3, swi_pgsql_query2, PL_FA_NONDETERMINISTIC);
 }
-
-typedef struct {
-	int valid;
-	PGconn *dbx;
-} pq_connection_encoded;
 
 
 foreign_t swi_pgsql_connect1(term_t dbx)
 {
-  char    errmsg[256];
+  char    errmsg[1024];
   char    *tenv;
   char 	*hostname;
   char	*dbname;
   char	*port;
+  PGconn  *conn;
 
   if (PL_term_type(dbx) != PL_VARIABLE)
   {
@@ -86,7 +194,7 @@ foreign_t swi_pgsql_connect1(term_t dbx)
   tenv = getenv("PGHOST");
   if (!tenv)
   {
-    snprintf(errmsg, 255, "PGSQL: pl_pgsql_connect/1 failed.\nNo environment variable $PGHOST\n");
+    snprintf(errmsg, sizeof(errmsg), "PGSQL: pl_pgsql_connect/1 failed.\nNo environment variable $PGHOST\n");
     PLException(errmsg,"pl_pgsql_connect/1");
   }
   hostname = tenv;
@@ -104,28 +212,28 @@ foreign_t swi_pgsql_connect1(term_t dbx)
   tenv = getenv("PGDATABASE");
   if (!tenv)
   {
-    snprintf (errmsg, 255, "PGSQL: pl_pgsql_connect/1 failed.\nNo environment variable $PGDATABASE\n");
+    snprintf (errmsg, sizeof(errmsg), "PGSQL: pl_pgsql_connect/1 failed.\nNo environment variable $PGDATABASE\n");
     PLException(errmsg,"pl_pgsql_connect/1");
   }
   dbname = tenv;
 
-  pq_connection_encoded *pgconn = malloc(sizeof(pq_connection_encoded));
-  pgconn->dbx = PQsetdb(hostname, port, NULL, NULL, dbname);
-  pgconn->valid = 1;
+  conn = PQsetdb(hostname, port, NULL, NULL, dbname);
+  if (!conn)
+  {
+    return PL_resource_error("memory");
+  }
 
   /*
    * check to see that the backend connection was successfully made
    */
-  if (PQstatus(pgconn->dbx) == CONNECTION_BAD)
+  if (PQstatus(conn) == CONNECTION_BAD)
   {
-    snprintf (errmsg, 255, "PGSQL: Connection to database %s failed.\n%s", dbname, PQerrorMessage(pgconn->dbx));
-    PQfinish(pgconn->dbx);
-    pgconn->valid = 0;
+    snprintf (errmsg, sizeof(errmsg), "PGSQL: Connection to database %s failed.\n%s", dbname, PQerrorMessage(conn));
+    PQfinish(conn);
     PLException(errmsg,"pl_pgsql_connect/1");
   }
 
-  PL_unify_pointer(dbx, pgconn);
-  PL_succeed;
+  return unify_connection(dbx, conn);
 }
 
 
@@ -137,41 +245,43 @@ foreign_t swi_pgsql_connect2(term_t p_hostname, term_t p_port, term_t p_user, te
   char 	*port = NULL;
   char 	*user = NULL;
   char 	*passwd = NULL;
+  PGconn *conn;
 
   if (PL_term_type(dbx) != PL_VARIABLE)
   {
     PL_fail;
   }
 
-  if (!PL_get_chars(p_hostname, &hostname, CVT_ATOM | CVT_STRING | CVT_LIST)) { PL_fail; }
-  if (!PL_get_chars(p_port, &port, CVT_INTEGER)) { PL_fail; }
-  if (!PL_get_chars(p_dbname, &dbname, CVT_ATOM | CVT_STRING | CVT_LIST)) { PL_fail; }
+  /* BUF_STACK: the strings must stay valid while the others are converted */
+  if (!PL_get_chars(p_hostname, &hostname, CVT_ATOM | CVT_STRING | CVT_LIST | BUF_STACK)) { PL_fail; }
+  if (!PL_get_chars(p_port, &port, CVT_INTEGER | BUF_STACK)) { PL_fail; }
+  if (!PL_get_chars(p_dbname, &dbname, CVT_ATOM | CVT_STRING | CVT_LIST | BUF_STACK)) { PL_fail; }
   if (PL_term_type(p_user) != PL_VARIABLE)
   {
-    if (!PL_get_chars(p_user, &user, CVT_ATOM | CVT_STRING | CVT_LIST)) { PL_fail; }
+    if (!PL_get_chars(p_user, &user, CVT_ATOM | CVT_STRING | CVT_LIST | BUF_STACK)) { PL_fail; }
   }
   if (PL_term_type(p_passwd) != PL_VARIABLE)
   {
-    if (!PL_get_chars(p_passwd, &passwd, CVT_ATOM | CVT_STRING | CVT_LIST)) { PL_fail; }
+    if (!PL_get_chars(p_passwd, &passwd, CVT_ATOM | CVT_STRING | CVT_LIST | BUF_STACK)) { PL_fail; }
   }
 
-  pq_connection_encoded *pgconn = malloc(sizeof(pq_connection_encoded));
-  pgconn->dbx = PQsetdbLogin(hostname, port, NULL, NULL, dbname, user, passwd);
-  pgconn->valid = 1;
+  conn = PQsetdbLogin(hostname, port, NULL, NULL, dbname, user, passwd);
+  if (!conn)
+  {
+    return PL_resource_error("memory");
+  }
 
   /*
    * check to see that the backend connection was successfully made
    */
-  if (PQstatus(pgconn->dbx) == CONNECTION_BAD)
+  if (PQstatus(conn) == CONNECTION_BAD)
   {
-    sprintf (errmsg, "PGSQL: Connection to database %s failed.\n%s", dbname, PQerrorMessage(pgconn->dbx));
-    PQfinish(pgconn->dbx);
-    pgconn->valid = 0;
+    snprintf (errmsg, sizeof(errmsg), "PGSQL: Connection to database %s failed.\n%s", dbname, PQerrorMessage(conn));
+    PQfinish(conn);
     PLException(errmsg,"pl_pgsql_connect/6");
   }
 
-  PL_unify_pointer(dbx, pgconn);
-  PL_succeed;
+  return unify_connection(dbx, conn);
 }
 
 
@@ -179,16 +289,19 @@ foreign_t swi_pgsql_disconnect (term_t dbx)
 {
   pq_connection_encoded *pgconn;
 
-  PL_get_pointer(dbx, &pgconn);
-  if (!pgconn || !pgconn->valid)
+  if (!get_connection(dbx, &pgconn))
   {
-    PL_fail;
+    return PL_type_error("pgsql_connection", dbx);
+  }
+  if (!pgconn->dbx)
+  {
+    PL_fail;	/* already disconnected */
   }
 
   if (PQstatus(pgconn->dbx) == CONNECTION_OK)
   {
     PQfinish(pgconn->dbx);
-    pgconn->valid = 0;
+    pgconn->dbx = NULL;
   } else {
     char *typereason;
     char errmsg[1024];
@@ -219,54 +332,158 @@ foreign_t swi_pgsql_disconnect (term_t dbx)
         typereason="unknown Connection type reason.";
         break;
     };
-    strncpy (errmsg, "PGSQL: connection type: ", 1023);
-    strncat (errmsg, typereason, 1023);
+    snprintf (errmsg, sizeof(errmsg), "PGSQL: connection type: %s", typereason);
     PQfinish(pgconn->dbx);
-    pgconn->valid = 0;
-    free(pgconn);
+    pgconn->dbx = NULL;
     PLException(errmsg,"pl_pgsql_disconnect/1");
   }
-  free(pgconn);
   PL_succeed;
 }
-                
+
+
+/* Queries */
+
+/* frees the parameter values collected by get_params() */
+static void free_params(char **values, size_t nparams)
+{
+  size_t i;
+
+  if (!values)
+  {
+    return;
+  }
+  for (i = 0; i < nparams; i++)
+  {
+    if (values[i])
+    {
+      PL_free(values[i]);
+    }
+  }
+  free(values);
+}
+
+/* converts the Prolog list params to an array of strings for PQexecParams;
+ * [] becomes SQL NULL. On error, an exception is raised and FALSE returned. */
+static int get_params(term_t params, size_t *nparams, char ***values)
+{
+  term_t lst = PL_copy_term_ref(params);
+  term_t head = PL_new_term_ref();
+  size_t len, i;
+
+  *nparams = 0;
+  *values = NULL;
+  if (PL_skip_list(params, 0, &len) != PL_LIST)
+  {
+    return PL_type_error("list", params);
+  }
+  if (len == 0)
+  {
+    return TRUE;
+  }
+  if (len > 65535)	/* limit of the PostgreSQL protocol */
+  {
+    return PL_domain_error("pgsql_parameter_list", params);
+  }
+
+  *values = calloc(len, sizeof(char *));
+  if (!*values)
+  {
+    return PL_resource_error("memory");
+  }
+  for (i = 0; PL_get_list(lst, head, lst); i++)
+  {
+    if (PL_get_nil(head))
+    {
+      continue;		/* SQL NULL */
+    }
+    if (!PL_get_chars(head, &(*values)[i], CVT_ATOMIC | CVT_LIST | BUF_MALLOC))
+    {
+      free_params(*values, len);
+      *values = NULL;
+      return PL_type_error("pgsql_parameter", head);
+    }
+  }
+  *nparams = len;
+  return TRUE;
+}
+
+/* sends query (with the values in the list params, unless params is 0) and
+ * returns the result in res if its status is COMMAND_OK or TUPLES_OK.
+ * Otherwise an exception is raised and FALSE returned. */
+static int exec_query(term_t dbx, term_t query, term_t params, const char *who, PGresult **res)
+{
+  char	errmsg[1024];
+  char	*qstr;
+  char	**values = NULL;
+  size_t nparams = 0;
+  PGresult *result;
+  ExecStatusType status;
+  pq_connection_encoded *pgconn;
+
+  *res = NULL;
+  if (!get_open_connection(dbx, &pgconn, who))
+  {
+    return FALSE;
+  }
+  if (params && !get_params(params, &nparams, &values))
+  {
+    return FALSE;
+  }
+  /* converted last: the discardable buffer is reused by the next conversion */
+  if (!PL_get_chars(query, &qstr, CVT_ATOM | CVT_STRING | CVT_LIST))
+  {
+    free_params(values, nparams);
+    return PL_type_error("text", query);
+  }
+
+  if (params)
+  {
+    result = PQexecParams(pgconn->dbx, qstr, (int)nparams, NULL,
+                          (const char * const *)values, NULL, NULL, 0);
+  } else {
+    result = PQexec(pgconn->dbx, qstr);
+  }
+  free_params(values, nparams);
+
+  if (!result)
+  {
+    snprintf(errmsg, sizeof(errmsg), "PGSQL: %s", PQerrorMessage(pgconn->dbx));
+    PLException(errmsg, (char *)who);
+  }
+  status = PQresultStatus(result);
+  if ((status != PGRES_COMMAND_OK) && (status != PGRES_TUPLES_OK))
+  {
+    snprintf(errmsg, sizeof(errmsg), "PGSQL: %s -> %s", PQresStatus(status), PQresultErrorMessage(result));
+    PQclear(result);
+    PLException(errmsg, (char *)who);
+  }
+  *res = result;
+  return TRUE;
+}
+
 
 foreign_t swi_pgsql_query1 (term_t dbx, term_t query)
 {
-  char	errmsg[1024];
   PGresult *result;
-  char	*qstr;
-  unsigned long t_val;
 
-  pq_connection_encoded *pgconn;
-
-  PL_get_pointer(dbx, &pgconn);
-  if (!pgconn || !pgconn->valid)
+  if (!exec_query(dbx, query, 0, "pl_pgsql_query/2", &result))
   {
-    strncpy (errmsg, "PGSQL: connection NULL", 1023);
-    PLException(errmsg,"pl_pgsql_query/2");
-    PL_fail;
+    return FALSE;
   }
-  if (PQstatus(pgconn->dbx) != CONNECTION_OK)
-  {
-    strncpy (errmsg, "PGSQL: connection lost", 1023);
-    PLException(errmsg,"pl_pgsql_query/2");
-    PL_fail;
-  }
+  PQclear(result);
+  PL_succeed;
+}
 
-  PL_get_chars(query, &qstr, CVT_ATOM | CVT_STRING | CVT_LIST);
+foreign_t swi_pgsql_exec (term_t dbx, term_t query, term_t params)
+{
+  PGresult *result;
 
-  result = PQexec (pgconn->dbx, qstr);
-  if (result || (PQresultStatus(result) == PGRES_COMMAND_OK)
-      ||  (PQresultStatus(result) == PGRES_TUPLES_OK)) 
+  if (!exec_query(dbx, query, params, "pl_pgsql_exec/3", &result))
   {
-    PQclear(result);
-    PL_succeed;
+    return FALSE;
   }
-  snprintf(errmsg, 1023, "PGSQL: %s -> %s", PQresStatus(PQresultStatus(result)), PQresultErrorMessage(result));
-  if (result) PQclear(result);
-  PLException(errmsg,"pl_pgsql_query/2");
-  PL_fail;
+  PQclear(result);
+  PL_succeed;
 }
 
 typedef struct {
@@ -286,26 +503,30 @@ int unify_result_row(PGresult *result, int nfields, int idx, term_t out_row)
   for (fnum = 0; fnum < nfields; fnum++)
   {
     char *tchar;
+    if (!PL_unify_list(lst, val, lst))
+    {
+      return FALSE;
+    }
+    if (PQgetisnull(result, idx, fnum))
+    {
+      if (!PL_unify_nil(val)) { return FALSE; }
+      continue;
+    }
     tchar = PQgetvalue(result, idx, fnum);
-    PL_unify_list(lst, val, lst);
     /* printf ("got: type %d  value %s\n", PQftype((*result),fnum), tchar);  */
     switch (PQftype(result, fnum)) {
         case INT2OID:
         case INT4OID:
         case OIDOID:
-                PL_unify_integer(val, strtol(tchar,NULL,10));
+                if (!PL_unify_integer(val, strtol(tchar,NULL,10))) { return FALSE; }
                 break;
         case FLOAT4OID:
         case FLOAT8OID:
         case CASHOID:
-                PL_unify_float(val, strtod(tchar,NULL));
+                if (!PL_unify_float(val, strtod(tchar,NULL))) { return FALSE; }
                 break;
         default:
-                if (strncmp(tchar,"NULL",4) == 0) {
-                    PL_unify_nil(val);
-                } else {
-                    PL_unify_string_chars(val, tchar);
-                }
+                if (!PL_unify_string_chars(val, tchar)) { return FALSE; }
                 break;
     } /* switch field type */
   } /* for every field in the row */
@@ -313,37 +534,19 @@ int unify_result_row(PGresult *result, int nfields, int idx, term_t out_row)
   return PL_unify_nil(lst);
 }
 
-foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res) 
+static int query_all(term_t dbx, term_t query, term_t params, term_t out_res, const char *who)
 {
-  char errmsg[256];
+  PGresult *pqres;
 
   if (! PL_is_variable(out_res))
   {
-    strncpy (errmsg, "PGSQL: last argument should be variable output!", 1023);
-    PLException(errmsg,"pl_pgsql_query/3");
+    PLException("PGSQL: last argument should be variable output!", (char *)who);
   }
 
-  /* fprintf(stderr, "Conn: %lx Query: %s\n", my_pgsql->value.l,query); */
-
-  PGresult *pqres;
-  char *qstr;
-
-  pq_connection_encoded *pgconn;
-
-  PL_get_pointer(dbx, &pgconn);
-  if (!pgconn || !pgconn->valid) { PL_fail; }
-
-  PL_get_chars(query, &qstr, CVT_ATOM | CVT_STRING | CVT_LIST);
-
   /* send query and receive result */
-  pqres = PQexec (pgconn->dbx, qstr);
-  if ((PQresultStatus(pqres) != PGRES_COMMAND_OK) &&
-      (PQresultStatus(pqres) != PGRES_TUPLES_OK))
+  if (!exec_query(dbx, query, params, who, &pqres))
   {
-    snprintf(errmsg, 1023, "PGSQL: %s -> %s", PQresStatus(PQresultStatus(pqres)), PQresultErrorMessage(pqres));
-    PQclear(pqres);
-    PLException(errmsg,"pl_pgsql_query_all/3");
-    PL_fail;
+    return FALSE;
   }
 
   int nrows = PQntuples(pqres);
@@ -361,55 +564,48 @@ foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res)
   int rowidx;
   for (rowidx = 0; rowidx < nrows; rowidx++)
   {
-    PL_unify_list(lst, row, lst);
-    unify_result_row(pqres, nfields, rowidx, row);
+    if (!PL_unify_list(lst, row, lst) ||
+        !unify_result_row(pqres, nfields, rowidx, row))
+    {
+      PQclear(pqres);
+      return FALSE;
+    }
   }
 
   PQclear(pqres);
   return PL_unify_nil(lst);
 }
+
+foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res) 
+{
+  return query_all(dbx, query, 0, out_res, "pl_pgsql_query_all/3");
+}
+
+foreign_t swi_pgsql_query_all_params (term_t dbx, term_t query, term_t params, term_t out_res) 
+{
+  return query_all(dbx, query, params, out_res, "pl_pgsql_query_all/4");
+}
     
 
-foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t handle) 
+foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t handle) 
 {
   pq_result_encoded *result;
-  char errmsg[1024];
-
-  if (! PL_is_variable(my_res))
-  {
-    strncpy (errmsg, "PGSQL: last argument should be variable output!", 1023);
-    PLException(errmsg,"pl_pgsql_query/3");
-  }
-
-  /* fprintf(stderr, "Conn: %lx Query: %s\n", my_pgsql->value.l,query); */
 
   switch (PL_foreign_control(handle))
   { 
     case PL_FIRST_CALL:
       {
         PGresult   *pqres;
-        char	*qstr;
-        unsigned long t_val;
 
-        pq_connection_encoded *pgconn;
-
-        PL_get_pointer(dbx, &pgconn);
-        if (!pgconn || !pgconn->valid)
+        if (! PL_is_variable(my_res))
         {
-          PL_fail;
+          PLException("PGSQL: last argument should be variable output!", "pl_pgsql_query/3");
         }
 
-        PL_get_chars(query, &qstr, CVT_ATOM | CVT_STRING | CVT_LIST);
-
         /* send query and receive result */
-        pqres = PQexec (pgconn->dbx, qstr);
-        if ((PQresultStatus(pqres) != PGRES_COMMAND_OK)
-            && (PQresultStatus(pqres) != PGRES_TUPLES_OK)) {
-
-          snprintf(errmsg, 1023, "PGSQL: %s -> %s", PQresStatus(PQresultStatus(pqres)), PQresultErrorMessage(pqres));
-          PQclear(pqres);
-          PLException(errmsg,"pl_pgsql_query/3");
-          PL_fail;
+        if (!exec_query(dbx, query, 0, "pl_pgsql_query/3", &pqres))
+        {
+          return FALSE;
         }
         if (PQntuples(pqres) <= 0)
         {
@@ -417,6 +613,11 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t h
           PL_fail;
         }
         result = malloc(sizeof(pq_result_encoded));
+        if (!result)
+        {
+          PQclear(pqres);
+          return PL_resource_error("memory");
+        }
         result->result = pqres;
         result->nrows =  PQntuples(pqres);
         result->nfields = PQnfields(pqres);
@@ -426,17 +627,22 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t h
     case PL_REDO:
       result = PL_foreign_context_address(handle);
       break;
-    case PL_CUTTED:
+    case PL_PRUNED:
+    default:
       result = PL_foreign_context_address(handle);
       PQclear(result->result);
       free(result);
       PL_succeed;
-      break;
   }
 
   /* fprintf(stderr, "Result rows: %d fields: %d\n", nrows, nfields); */
 
-  unify_result_row(result->result, result->nfields, result->atrow, my_res);
+  if (!unify_result_row(result->result, result->nfields, result->atrow, my_res))
+  {
+    PQclear(result->result);
+    free(result);
+    return FALSE;
+  }
 
   result->atrow++;
 
@@ -447,11 +653,5 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, foreign_t h
     PL_succeed;		// stop here
   }
 
-
-  if (PL_foreign_control(handle) != PL_CUTTED)
-  {
-    PL_retry_address(result);
-  }
-  PL_succeed;
+  PL_retry_address(result);
 }
-

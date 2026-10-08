@@ -9,6 +9,9 @@
 %   /redirect       303 to /get
 %   /slow           answers after 5 seconds (timeout tests)
 %   /utf8           text/plain; charset=UTF-8 body "Gr\u00FC\u00DFe" followed by U+1F600 (smiley)
+%   /loop           303 to itself (redirect limit)
+%   /big            text/plain body of 100000 bytes (body size limit)
+%   /file           302 to file:///etc/passwd (redirect protocol restriction)
 
 :- encoding(utf8).
 
@@ -22,6 +25,9 @@
 :- http_handler(root(redirect), handle_redirect, []).
 :- http_handler(root(slow),     handle_slow,     []).
 :- http_handler(root(utf8),     handle_utf8,     []).
+:- http_handler(root(loop),     handle_loop,     []).
+:- http_handler(root(big),      handle_big,      []).
+:- http_handler(root(file),     handle_file,     []).
 
 handle_get(Request) :-
     ( memberchk(search(Search), Request) -> true ; Search = [] ),
@@ -61,6 +67,18 @@ handle_slow(_Request) :-
 handle_utf8(_Request) :-
     format('Content-type: text/plain; charset=UTF-8~n~n'),
     format('Gr~c~ce ~c', [252, 223, 128512]).
+
+handle_loop(Request) :-
+    http_redirect(see_other, root(loop), Request).
+
+handle_big(_Request) :-
+    format('Content-type: text/plain~n~n'),
+    forall(between(1, 100000, _), put_char(x)).
+
+handle_file(_Request) :-
+    format('Status: 302~n'),
+    format('Location: file:///etc/passwd~n'),
+    format('Content-type: text/plain~n~n').
 
 main :-
     current_prolog_flag(argv, Argv),

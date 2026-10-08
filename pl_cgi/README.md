@@ -20,17 +20,42 @@ variables are parsed into predicates:
 
 `cgi_in(<name>,<content>).`
 
+The request parameters are read from `QUERY_STRING` (method GET) or from
+stdin (other methods, at most `CONTENT_LENGTH` bytes). Input longer than
+1 MiB makes `init_cgi` throw `error(resource_error(cgi_input_length(Max)),_)`;
+assert `cgi_env(plMaxInput, Bytes)` before `init_cgi` to change the limit.
+
 Cookies
 -------
 are available in the predicate:
 
 `cgi_cookies(<name>,<content>).`
 
+Templates
+---------
+`generate_html_output(Predlist, File)` copies the template File to the
+output, replacing
+
+* `@name@` with the value `V` of the first `P(name, V)` fact for a predicate
+  `P` in Predlist (default `[cgi_in]`). The value is HTML-escaped
+  (`<`, `>`, `&`, `"`, `'`), so request parameters cannot inject markup or
+  scripts into the page.
+* `@!name@` likewise, but **without** escaping. Only use it for values the
+  application controls, never for request parameters or cookies.
+* `{Goal}` with whatever `Goal` writes. The goal's output is not escaped.
+
+Headers
+-------
+`cgi_env/2` facts for `plContentType`, `plStatus`, `plPragma`,
+`plCacheControl`, `plLocation` and `plModified` are written as response
+headers. CR and LF are removed from their values, so a value that contains
+user input cannot add further headers.
+
 
 LICENSE
 -------
 
-Copyright (C) 1999-2023  Alexander Diemand
+Copyright (C) 1999-2026  Alexander Diemand
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

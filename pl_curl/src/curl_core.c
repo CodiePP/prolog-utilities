@@ -28,10 +28,16 @@ struct growbuf {
   char *data;
   size_t len;
   size_t cap;
+  size_t max;      /* 0 = unlimited */
+  int too_big;     /* set when an append would exceed max */
 };
 
 static int growbuf_append(struct growbuf *b, const char *ptr, size_t n)
 {
+  if (b->max && b->len + n > b->max) {
+    b->too_big = 1;
+    return 0;
+  }
   if (b->len + n + 1 > b->cap) {
     size_t newcap = b->cap ? b->cap * 2 : 4096;
     char *nd;
@@ -137,6 +143,8 @@ static char *build_url_with_params(CURL *curl, const pl_curl_request *req)
 
   url.cap = base_len + 1;
   url.len = 0;
+  url.max = 0;
+  url.too_big = 0;
   url.data = (char *)malloc(url.cap);
   if (!url.data) {
     return NULL;
@@ -171,18 +179,79 @@ void pl_curl_global_init(void)
   curl_global_init(CURL_GLOBAL_DEFAULT);
 }
 
+/* returns "<a><b><c>" in a newly allocated string, NULL if out of memory */
+static char *concat3(const char *a, const char *b, const char *c)
+{
+  size_t la = strlen(a), lb = strlen(b), lc = strlen(c);
+  char *r = (char *)malloc(la + lb + lc + 1);
+  if (!r) {
+    return NULL;
+  }
+  memcpy(r, a, la);
+  memcpy(r + la, b, lb);
+  memcpy(r + la + lb, c, lc);
+  r[la + lb + lc] = '\0';
+  return r;
+}
+
+/* CR or LF in a header would let the caller inject further headers */
+static int has_crlf(const char *s)
+{
+  return s && strpbrk(s, "\r\n") != NULL;
+}
+
+/* appends "<a><b><c>" to *slist; returns 0 if out of memory */
+static int slist_append3(struct curl_slist **slist, const char *a, const char *b, const char *c)
+{
+  struct curl_slist *nl;
+  char *line = concat3(a, b, c);
+  if (!line) {
+    return 0;
+  }
+  nl = curl_slist_append(*slist, line);
+  free(line);
+  if (!nl) {
+    return 0;
+  }
+  *slist = nl;
+  return 1;
+}
+
 int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
 {
   CURL *curl;
   CURLcode rc;
   struct curl_slist *slist = NULL;
-  struct growbuf body = { NULL, 0, 0 };
+  struct growbuf body = { NULL, 0, 0, 0, 0 };
   struct header_acc hacc = { NULL, 0, 0 };
   char *full_url = NULL;
-  char authbuf[512];
+  long timeout = req->timeout_sec > 0 ? req->timeout_sec : PL_CURL_DEFAULT_TIMEOUT;
+  long connect_timeout = req->connect_timeout_sec > 0 ? req->connect_timeout_sec
+                                                      : PL_CURL_DEFAULT_CONNECT_TIMEOUT;
+  long max_body = req->max_body > 0 ? req->max_body : PL_CURL_DEFAULT_MAX_BODY;
   int i;
 
   memset(resp, 0, sizeof(*resp));
+
+  /* the headers may be newer than the library loaded at run time */
+  if (curl_version_info(CURLVERSION_NOW)->version_num < PL_CURL_MIN_VERSION_NUM) {
+    snprintf(resp->errbuf, sizeof(resp->errbuf), "libcurl %s is too old, need >= %s",
+             curl_version_info(CURLVERSION_NOW)->version, PL_CURL_MIN_VERSION);
+    return 0;
+  }
+
+  for (i = 0; i < req->n_headers; i++) {
+    if (has_crlf(req->headers[i].name) || has_crlf(req->headers[i].value) ||
+        strchr(req->headers[i].name, ':')) {
+      snprintf(resp->errbuf, sizeof(resp->errbuf), "invalid header name or value: %s",
+               req->headers[i].name);
+      return 0;
+    }
+  }
+  if (has_crlf(req->auth_pass) || has_crlf(req->auth_user) || has_crlf(req->user_agent)) {
+    snprintf(resp->errbuf, sizeof(resp->errbuf), "CR/LF not allowed in credentials or user agent");
+    return 0;
+  }
 
   curl = curl_easy_init();
   if (!curl) {
@@ -197,51 +266,58 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
     return 0;
   }
 
+  body.max = (size_t)max_body;
+
   curl_easy_setopt(curl, CURLOPT_URL, full_url);
   curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
   curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, resp->errbuf);
   curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 
+  /* only plain HTTP(S), also when following redirects (no file://, ftp://, ...) */
+#if LIBCURL_VERSION_NUM >= 0x075500
+  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+#else
+  curl_easy_setopt(curl, CURLOPT_PROTOCOLS, (long)(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS, (long)(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+#endif
+
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, body_write_cb);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_write_cb);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, &hacc);
+  /* rejects early if the server announces a larger body; body_write_cb
+   * enforces the limit when it does not */
+  curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)max_body);
 
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, req->follow_redirect ? 1L : 0L);
+  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, PL_CURL_MAX_REDIRS);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, req->ssl_verify ? 1L : 0L);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, req->ssl_verify ? 2L : 0L);
 
-  if (req->timeout_sec > 0) {
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, req->timeout_sec);
-  }
-  if (req->connect_timeout_sec > 0) {
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, req->connect_timeout_sec);
-  }
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, connect_timeout);
   if (req->user_agent) {
     curl_easy_setopt(curl, CURLOPT_USERAGENT, req->user_agent);
   }
 
   for (i = 0; i < req->n_headers; i++) {
-    char linebuf[1024];
-    snprintf(linebuf, sizeof(linebuf), "%s: %s", req->headers[i].name, req->headers[i].value);
-    slist = curl_slist_append(slist, linebuf);
+    if (!slist_append3(&slist, req->headers[i].name, ": ", req->headers[i].value)) {
+      goto out_of_memory;
+    }
   }
 
   switch (req->auth_mode) {
     case PL_CURL_AUTH_BASIC:
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_BASIC);
-      snprintf(authbuf, sizeof(authbuf), "%s:%s",
-               req->auth_user ? req->auth_user : "",
-               req->auth_pass ? req->auth_pass : "");
-      curl_easy_setopt(curl, CURLOPT_USERPWD, authbuf);
+      curl_easy_setopt(curl, CURLOPT_USERNAME, req->auth_user ? req->auth_user : "");
+      curl_easy_setopt(curl, CURLOPT_PASSWORD, req->auth_pass ? req->auth_pass : "");
       break;
-    case PL_CURL_AUTH_BEARER: {
-      char linebuf[1024];
-      snprintf(linebuf, sizeof(linebuf), "Authorization: Bearer %s",
-               req->auth_pass ? req->auth_pass : "");
-      slist = curl_slist_append(slist, linebuf);
+    case PL_CURL_AUTH_BEARER:
+      if (!slist_append3(&slist, "Authorization: Bearer ", req->auth_pass ? req->auth_pass : "", "")) {
+        goto out_of_memory;
+      }
       break;
-    }
     case PL_CURL_AUTH_NONE:
     default:
       break;
@@ -254,7 +330,10 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
   rc = curl_easy_perform(curl);
 
   if (rc != CURLE_OK) {
-    if (resp->errbuf[0] == '\0') {
+    if (body.too_big || rc == CURLE_FILESIZE_EXCEEDED) {
+      snprintf(resp->errbuf, sizeof(resp->errbuf),
+               "response body exceeds the limit of %ld bytes", max_body);
+    } else if (resp->errbuf[0] == '\0') {
       snprintf(resp->errbuf, sizeof(resp->errbuf), "%s", curl_easy_strerror(rc));
     }
     resp->ok = 0;
@@ -272,6 +351,7 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
     hacc.n_headers = 0;
   }
 
+done:
   if (slist) {
     curl_slist_free_all(slist);
   }
@@ -285,6 +365,11 @@ int pl_curl_get_perform(const pl_curl_request *req, pl_curl_response *resp)
   free(hacc.headers);
 
   return resp->ok;
+
+out_of_memory:
+  snprintf(resp->errbuf, sizeof(resp->errbuf), "out of memory building request headers");
+  resp->ok = 0;
+  goto done;
 }
 
 void pl_curl_response_free(pl_curl_response *resp)

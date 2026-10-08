@@ -23,9 +23,8 @@ done
 echo "::: building pl_postgresql"
 (
     cd pl_postgresql
-    aclocal --force
-    autoheader --force
-    autoconf --force
+    # also installs current config/install-sh, config.guess, config.sub
+    autoreconf -fi
     ./configure
     make SWIPL="$SWIPL" CFLAGS="-g -O2 -fPIC -Wall"
 )

@@ -21,6 +21,21 @@
 #include <stddef.h>
 #include <curl/curl.h>
 
+/* 7.58.0: libcurl no longer forwards a custom Authorization header (bearer_auth)
+ * when a redirect goes to another host. Older versions leak the token. */
+#define PL_CURL_MIN_VERSION_NUM 0x073A00
+#define PL_CURL_MIN_VERSION     "7.58.0"
+
+#if LIBCURL_VERSION_NUM < PL_CURL_MIN_VERSION_NUM
+#error "pl_curl needs libcurl >= 7.58.0"
+#endif
+
+/* limits applied unless the request overrides them */
+#define PL_CURL_DEFAULT_TIMEOUT          300L                 /* seconds, whole transfer */
+#define PL_CURL_DEFAULT_CONNECT_TIMEOUT  30L                  /* seconds */
+#define PL_CURL_DEFAULT_MAX_BODY         (64L * 1024 * 1024)  /* bytes */
+#define PL_CURL_MAX_REDIRS               10L
+
 /* a simple name/value pair, used for both query parameters and headers */
 typedef struct {
   char *name;
@@ -46,8 +61,9 @@ typedef struct {
   const char *auth_user;         /* basic: user name   / bearer: unused */
   const char *auth_pass;         /* basic: password     / bearer: token */
 
-  long timeout_sec;              /* 0 = libcurl default (no timeout) */
-  long connect_timeout_sec;      /* 0 = libcurl default */
+  long timeout_sec;              /* <= 0: PL_CURL_DEFAULT_TIMEOUT */
+  long connect_timeout_sec;      /* <= 0: PL_CURL_DEFAULT_CONNECT_TIMEOUT */
+  long max_body;                 /* max. response body size in bytes, <= 0: PL_CURL_DEFAULT_MAX_BODY */
 
   int follow_redirect;           /* 1 = follow (default), 0 = do not follow */
   int ssl_verify;                /* 1 = verify (default), 0 = disable verification */

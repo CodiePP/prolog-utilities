@@ -3,6 +3,26 @@ Prolog utilities
 ================
 
 
+Requirements
+------------
+
+| dependency | minimum | tested with | needed by |
+|---|---|---|---|
+| SWI-Prolog (headers + `swipl`) | 8.0 | 8.5.12 | SWI-Prolog builds of all modules |
+| GNU Prolog (`gplc`) | 1.4.0 | 1.5.0 | GNU Prolog builds (`pl_toolbox`, `pl_regexp`, `pl_cgi`, `pl_curl`) |
+| libcurl (headers + library) | 7.58.0 | 8.7.1 | `pl_curl` |
+| libpq (PostgreSQL client) | 9.0 | 16 | `pl_postgresql` (SWI-Prolog only) |
+| autoconf | 2.70 | 2.73 | `pl_postgresql` (`autoreconf -fi`) |
+| pkg-config, make, C compiler | | | all |
+
+The minimums are enforced at build time (`#error` in the C bridges, version
+constraints in `pl_postgresql/configure.ac`); `pl_curl` also refuses to run
+against an older libcurl at run time. libcurl 7.58.0 is the first version that
+does not forward a `bearer_auth` token to another host on a redirect.
+
+`nix-shell` (see [shell.nix](shell.nix), pinned nixpkgs) provides all of them.
+
+
 [pl_toolbox](pl_toolbox)
 ----------
 

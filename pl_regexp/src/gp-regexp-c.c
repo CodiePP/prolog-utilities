@@ -20,6 +20,10 @@
 
 #include <stdlib.h>
 #include "gprolog.h"
+
+#if !defined(__GPROLOG_VERSION__) || __GPROLOG_VERSION__ < 10400
+#error "needs GNU Prolog >= 1.4.0"
+#endif
 #include <regex.h>
 
 /* Prototypes */
