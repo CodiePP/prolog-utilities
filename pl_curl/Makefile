@@ -20,7 +20,7 @@ NAME = plcurl
 SWI_OBJS = swi-curl.o curl_core.o
 GP_OBJS = gp-curl.gpo gp-curl-c.gpo curl_core.gpo
 QLF = src/curl.qlf
-LIBS = -lcurl
+LIBS = -lcurl -pthread
 TOP_SRC = src/top-curl.pl
 
 include ../mk/common.mk

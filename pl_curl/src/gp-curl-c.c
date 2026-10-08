@@ -36,6 +36,7 @@
  *   timeout(Seconds)            total request timeout, default 300
  *   connect_timeout(Seconds)    connect-phase timeout, default 30
  *   max_body(Bytes)             max. response body size, default 64 MiB
+ *   body_as(Type)               atom (default) or codes
  *   follow_redirect(Bool)       true/false, default true
  *   ssl_verify(Bool)            true/false, default true
  *   user_agent(Atom)
@@ -43,6 +44,31 @@
  * Headers is unified with a list of Name-Value atom pairs.
  * on transport error, an exception is thrown.
  */
+
+enum gp_body_type { GP_BODY_ATOM, GP_BODY_CODES };
+
+/* unifies body with the response body as a code list; unlike an atom, the
+ * list keeps NUL bytes */
+static PlBool gp_unify_body_codes(const pl_curl_response *resp, PlTerm body)
+{
+  PlTerm *codes;
+  PlBool ok;
+  size_t i;
+
+  if (resp->body_len == 0) {
+    return Pl_Un_Proper_List_Check(0, NULL, body);
+  }
+  codes = (PlTerm *)malloc(resp->body_len * sizeof(PlTerm));
+  if (!codes) {
+    return PL_FALSE;
+  }
+  for (i = 0; i < resp->body_len; i++) {
+    codes[i] = Pl_Mk_Integer((unsigned char)resp->body[i]);
+  }
+  ok = Pl_Un_Proper_List_Check((int)resp->body_len, codes, body);
+  free(codes);
+  return ok;
+}
 
 static int gp_curl_bool(PlTerm t)
 {
@@ -58,6 +84,7 @@ PlBool pl_curl_get(PlTerm p_url, PlTerm p_opts, PlTerm p_status, PlTerm p_header
   pl_curl_kv headers[64];
   int n_params = 0, n_headers = 0;
   PlTerm lst = p_opts;
+  enum gp_body_type body_type = GP_BODY_ATOM;
   PlTerm exc;
 
   memset(&req, 0, sizeof(req));
@@ -93,6 +120,15 @@ PlBool pl_curl_get(PlTerm p_url, PlTerm p_opts, PlTerm p_status, PlTerm p_header
       req.connect_timeout_sec = (long)Pl_Rd_Integer_Check(args[0]);
     } else if (args && arity == 1 && strcmp(name, "max_body") == 0) {
       req.max_body = (long)Pl_Rd_Integer_Check(args[0]);
+    } else if (args && arity == 1 && strcmp(name, "body_as") == 0) {
+      const char *t = Pl_Atom_Name(Pl_Rd_Atom_Check(args[0]));
+      if (strcmp(t, "codes") == 0) {
+        body_type = GP_BODY_CODES;
+      } else if (strcmp(t, "atom") == 0) {
+        body_type = GP_BODY_ATOM;
+      } else {
+        Pl_Err_Domain(Pl_Create_Atom("body_as"), args[0]);
+      }
     } else if (args && arity == 1 && strcmp(name, "follow_redirect") == 0) {
       req.follow_redirect = gp_curl_bool(args[0]);
     } else if (args && arity == 1 && strcmp(name, "ssl_verify") == 0) {
@@ -127,7 +163,10 @@ PlBool pl_curl_get(PlTerm p_url, PlTerm p_opts, PlTerm p_status, PlTerm p_header
 
     if (!Pl_Un_Integer_Check(resp.status_code, p_status) ||
         !Pl_Un_Proper_List_Check(resp.n_headers, hvals, p_headers) ||
-        !Pl_Un_String_Check(resp.body ? resp.body : "", p_body)) {
+        !(body_type == GP_BODY_CODES
+              ? gp_unify_body_codes(&resp, p_body)
+              /* an atom ends at the first NUL byte; use body_as(codes) for binary data */
+              : Pl_Un_String_Check(resp.body ? resp.body : "", p_body))) {
       pl_curl_response_free(&resp);
       return PL_FALSE;
     }

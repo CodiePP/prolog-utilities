@@ -148,6 +148,48 @@ test(file_scheme_refused, [throws(error(_, 'pl_curl_get/5'))]) :-
 test(redirect_to_file_refused, [throws(error(_, 'pl_curl_get/5'))]) :-
     get('/file', [], _, _, _).
 
+% --- body type ---------------------------------------------------------
+
+test(body_is_atom_by_default) :-
+    get('/conn', [], 200, _, Body),
+    atom(Body).
+
+test(body_as_string) :-
+    get('/get', [body_as(string)], 200, _, Body),
+    string(Body),
+    sub_string(Body, _, _, _, "\"args\""), !.
+
+test(body_as_codes_keeps_nul) :-
+    get('/binary', [body_as(codes)], 200, _, Body),
+    Body == [97, 0, 98, 255].
+
+test(body_as_atom_keeps_nul) :-
+    get('/binary', [], 200, _, Body),
+    atom_codes(Body, [97, 0, 98, 255]).
+
+test(body_as_invalid, [throws(error(domain_error(body_as, json), _))]) :-
+    get('/get', [body_as(json)], _, _, _).
+
+% --- keep-alive ----------------------------------------------------------
+
+test(connection_reused) :-
+    get('/conn', [], 200, _, C1),
+    get('/conn', [], 200, _, C2),
+    get('/get', [param(a, b)], 200, _, _),
+    get('/conn', [], 200, _, C3),
+    C1 == C2, C2 == C3.
+
+% each thread has its own handle (libcurl handles must not be shared between
+% concurrent threads); it is cleaned up when the thread ends
+test(threads_use_own_connections) :-
+    get('/conn', [], 200, _, Main),
+    numlist(1, 4, Ns),
+    maplist([_, T]>>thread_create(( get('/conn', [], 200, _, Id), Id \== Main ), T, []),
+            Ns, Ts),
+    maplist([T]>>thread_join(T, true), Ts),
+    get('/conn', [], 200, _, Main2),
+    Main2 == Main.
+
 % --- known defects ----------------------------------------------------
 
 test(utf8_body_decoded, [fixme('body is returned as a Latin-1 atom; should be UTF-8')]) :-

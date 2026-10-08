@@ -23,7 +23,4 @@
 
 :- module(curl, [ pl_curl_get/5 ]).
 
-curl:init :-
-	load_foreign_library(sbcl('plcurl')).
-
-:- initialization(curl:init).
+:- use_foreign_library(sbcl('plcurl')).
