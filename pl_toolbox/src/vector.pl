@@ -65,8 +65,8 @@ vrand(N,V) :-
 '$vrand1'(N,Temp,V) :-
         random(-65536.0,65536.0,R),
         Q is R / 65536.0,
-        append(Temp,[Q],Temp2),
-        '$vrand1'(N-1,Temp2,V).
+        N2 is N-1,
+        '$vrand1'(N2,[Q|Temp],V).
 
 
 

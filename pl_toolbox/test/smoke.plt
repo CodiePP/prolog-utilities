@@ -27,6 +27,11 @@ test(list2string_sep) :-
     atom_codes(A, S),
     A == 'x, y'.
 
+test(vrand) :-
+    vrand(5, V),
+    length(V, 5),
+    forall(member(X, V), ( float(X), X >= -1.0, X =< 1.0 )).
+
 :- end_tests(toolbox_smoke).
 
 :- begin_tests(toolbox_temporary_file).
