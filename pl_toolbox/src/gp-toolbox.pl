@@ -22,6 +22,9 @@
 /*   along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /*-------------------------------------------------------------------------*/
 
+% the text of a term as written by write/1, as codes (used by string.pl)
+'$toolbox_term_codes'(T,Codes) :- write_to_codes(Codes,T).
+
 :- include('math.pl').
 :- include('string.pl').
 :- include('stream.pl').

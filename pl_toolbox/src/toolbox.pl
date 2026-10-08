@@ -52,6 +52,9 @@
 		from_json/2, to_json/2, json_print/1, json_from_file/2
 	]).
 
+% the text of a term as written by write/1, as codes (used by string.pl)
+'$toolbox_term_codes'(T,Codes) :- format(codes(Codes),'~w',[T]).
+
 :- include('math.pl').
 :- include('string.pl').
 :- include('stream.pl').

@@ -16,6 +16,17 @@ test(json_roundtrip) :-
     toolbox:from_json(A, J2),
     J2 == J.
 
+test(list2string) :-
+    toolbox:list2string([a, 1, 'b c'], S),
+    atom_codes(A, S),
+    A == 'a 1 b c'.
+
+test(list2string_sep) :-
+    atom_codes(', ', Sep),
+    toolbox:list2string([x, y], Sep, S),
+    atom_codes(A, S),
+    A == 'x, y'.
+
 :- end_tests(toolbox_smoke).
 
 :- begin_tests(toolbox_temporary_file).

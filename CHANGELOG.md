@@ -62,6 +62,9 @@ All notable changes. The format follows
   and headers are no longer truncated; bodies keep NUL bytes.
 * JSON: the parser was exponential in the nesting depth; parsing and encoding
   are now linear (about 3x faster on 1 MB documents).
+* pl_toolbox: `list2string/2,3` raised an instantiation error (broken since
+  the GNU Prolog remake); values are now written as by `write/1` on both
+  systems.
 * pl_toolbox: `info_math` showed swapped formulas for `rad2grad/grad2rad`
   and a wrong value of pi.
 

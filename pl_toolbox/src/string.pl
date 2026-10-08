@@ -71,8 +71,7 @@ list2string(List,Sep,String) :-
 
 list2string_aux([],_,String,String) :- !.
 list2string_aux([A|R],Sep,In,String) :-
-	format(Tgt,'~p',[A]),
-  %atom_codes(Tgt,ACodes),
+	'$toolbox_term_codes'(A,ACodes),	% defined in toolbox.pl / gp-toolbox.pl
 	( In == [] ->
 		S1 = In
 	;
