@@ -10,7 +10,7 @@
 # in the image to rebuild or to link GNU Prolog programs.
 #
 # Built for linux/amd64 and linux/arm64 by .github/workflows/image.yml.
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 LABEL org.opencontainers.image.title="prolog-utilities" \
       org.opencontainers.image.description="SWI-Prolog and GNU Prolog utilities: JSON, regexp, CGI, libcurl and PostgreSQL bridges" \
