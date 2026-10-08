@@ -62,6 +62,10 @@ SWI_OBJ_FILES = $(addprefix $(OBJDIR)/,$(SWI_OBJS))
 GP_OBJ_FILES = $(addprefix $(OBJDIR)/,$(GP_OBJS))
 
 .PHONY: all top clean asan swi-check gp-check
+
+# gplc runs must not overlap: its temporary file names are not created
+# exclusively, so parallel runs can share and corrupt them ("make -j")
+.NOTPARALLEL:
 .SUFFIXES:
 
 all: $(if $(SWI_OBJS),$(SWI_LIB)) $(GP_LIB) $(QLF)

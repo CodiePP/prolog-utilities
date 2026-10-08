@@ -46,6 +46,9 @@ echo "${GPROLOG_SHA256}  gprolog-${GPROLOG_VERSION}.tar.gz" | sha256sum -c -
 tar xzf "gprolog-${GPROLOG_VERSION}.tar.gz"
 cd "gprolog-${GPROLOG_VERSION}/src"
 ./configure
-make -j"$(nproc)"
+# no "make -j": gplc derives its intermediate file names from
+# time(NULL) ^ getpid() and does not create them exclusively, so parallel
+# gplc runs (e.g. in Fd2C) can share temporary files and corrupt each other
+make
 $SUDO make install
 gplc --version | head -1
