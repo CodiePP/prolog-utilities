@@ -34,6 +34,8 @@ PREDICATES
 `pl_pgsql_query_all/4 (+connection,+query,+params,-results)`
     like `pl_pgsql_query_all/3`, with placeholders bound to params.
 
+Both the SWI-Prolog and the GNU Prolog bridge implement this contract.
+
 Errors are raised as `error(pgsql_error(Message), context(Predicate, _))`,
 e.g. when the server rejects a query or a connection cannot be made. Using a
 closed connection raises `existence_error(pgsql_connection, Handle)`, passing
@@ -63,11 +65,21 @@ list). The server infers the parameter types from the query; add a cast
 CONNECTION HANDLES
 ------------------
 
-A connection handle is an opaque blob, printed as `<pgsql_connection>(...)`.
-Using it after `pl_pgsql_disconnect/1` raises an existence error; anything
-that is not a handle raises a type error. A connection that is never disconnected is closed
+In SWI-Prolog, a connection handle is an opaque blob, printed as
+`<pgsql_connection>(...)`. A connection that is never disconnected is closed
 when its handle is garbage collected, but do not rely on that: always
 disconnect (e.g. with `setup_call_cleanup/3`).
+
+GNU Prolog has no equivalent of a blob, so there a handle is a small integer
+instead (the connection's 1-based position in an internal table that only
+grows: a handle is never reused for a different connection, so a stale one
+always raises an error rather than silently reaching someone else's
+connection). There is also no garbage collector hook to fall back on, so a
+forgotten connection is only closed when the process exits: always
+disconnect explicitly.
+
+Either way, using a handle after `pl_pgsql_disconnect/1` raises an existence
+error; passing something that is not a handle raises a type error.
 
 
 EXAMPLES
@@ -109,15 +121,17 @@ use_module(sbcl(pgsql)).
 HOW TO COMPILE
 --------------
 
+Just type `make` to build the SWI-Prolog foreign library, the GNU Prolog
+library and the precompiled `pgsql.qlf`. It needs `pkg-config` and libpq's
+development package (`libpq-dev` on Debian/Ubuntu, `postgresql` on Homebrew).
+
+
+GNU PROLOG top
+--------------
+
 ```sh
-autoreconf -fi
+gplc -o top --new-top-level src/top-pgsql.pl libplpgsql-$(uname -s).a -L "$(pkg-config --libs libpq)"
 ```
-(needs autoconf >= 2.70, which also installs the helper scripts in `config/`)
-then run
-```sh
-./configure
-```
-then call `make`
 
 
 INSTALLATION
@@ -141,10 +155,16 @@ COMMENTS
 
 Text arguments (queries, parameters, connection settings) may be atoms,
 strings or code lists. In results, `int2`/`int4`/`oid` columns are returned
-as integers, `float4`/`float8`/`money` as floats, SQL NULL as `[]` and
-everything else as SWI-Prolog strings.
+as integers, `float4`/`float8`/`money` as floats and SQL NULL as `[]`.
+Everything else is a SWI-Prolog string in the SWI-Prolog bridge, and a code
+list in the GNU Prolog bridge: GNU Prolog's atom table is a fixed resource,
+so a result column read back from a large table must never turn into an
+atom there.
 
-There is no GNU Prolog bridge for this module.
+In GNU Prolog, `pl_pgsql_query/3` is implemented in Prolog over
+`pl_pgsql_query_all/3` rather than with GNU Prolog's own nondeterministic
+foreign-call interface; one visible difference is that a query error raised
+through `pl_pgsql_query/3` carries the context `pl_pgsql_query_all/3`.
 
 
 LICENSE

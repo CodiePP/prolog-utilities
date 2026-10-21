@@ -15,8 +15,6 @@
 pkgs.mkShell {
     # build tools
     nativeBuildInputs = with pkgs; [
-        autoconf
-        automake
         gnumake
         pkg-config
         gprolog
@@ -28,7 +26,7 @@ pkgs.mkShell {
     buildInputs = with pkgs; [
         curl            # pl_curl
         libpq           # pl_postgresql
-        openssl         # pl_postgresql/configure checks libssl/libcrypto
+        openssl
         zlib
     ];
 }

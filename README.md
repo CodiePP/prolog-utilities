@@ -14,7 +14,7 @@ bridge and/or Prolog code, built for both Prolog systems where possible.
 | [pl_regexp](pl_regexp) | POSIX extended regular expressions: `pl_regexp/3` | yes | yes | libc `<regex.h>` |
 | [pl_cgi](pl_cgi) | CGI requests, cookies, HTML templates with escaping | yes | yes | pl_toolbox, pl_regexp |
 | [pl_curl](pl_curl) | HTTP(S) GET with parameters, headers, auth, limits: `pl_curl_get/5` | yes | yes | libcurl |
-| [pl_postgresql](pl_postgresql) | PostgreSQL queries, parameterised statements | yes | no | libpq |
+| [pl_postgresql](pl_postgresql) | PostgreSQL queries, parameterised statements | yes | yes | libpq |
 
 Supported platforms: Linux and macOS.
 
@@ -90,16 +90,16 @@ Requirements
 | dependency | minimum | tested with | needed by |
 |---|---|---|---|
 | SWI-Prolog (headers + `swipl`) | 8.0 | 8.5.12, 9.0.4, 9.2.9 | SWI-Prolog builds of all modules |
-| GNU Prolog (`gplc`) | 1.4.0 | 1.5.0 | GNU Prolog builds (`pl_toolbox`, `pl_regexp`, `pl_cgi`, `pl_curl`) |
+| GNU Prolog (`gplc`) | 1.4.0 | 1.5.0 | GNU Prolog builds (`pl_toolbox`, `pl_regexp`, `pl_cgi`, `pl_curl`, `pl_postgresql`) |
 | libcurl (headers + library) | 7.58.0 | 8.5.0, 8.7.1, 8.14.1 | `pl_curl` |
-| libpq (PostgreSQL client) | 9.0 | 16, 17 | `pl_postgresql` (SWI-Prolog only) |
-| autoconf | 2.70 | 2.71, 2.72, 2.73 | `pl_postgresql` (`autoreconf -fi`) |
+| libpq (PostgreSQL client) | 9.0 | 16, 17 | `pl_postgresql` |
 | pkg-config, make, C compiler | | | all |
 
-The minimums are enforced at build time (`#error` in the C bridges, version
-constraints in `pl_postgresql/configure.ac`); `pl_curl` also refuses to run
-against an older libcurl at run time. libcurl 7.58.0 is the first version that
-does not forward a `bearer_auth` token to another host on a redirect.
+The minimums are enforced at build time (`#error` in the C bridges, a
+`pkg-config --atleast-version` check for libpq); `pl_curl` also refuses to
+run against an older libcurl at run time. libcurl 7.58.0 is the first
+version that does not forward a `bearer_auth` token to another host on a
+redirect.
 
 `nix-shell` (see [shell.nix](shell.nix), pinned nixpkgs) provides all of them.
 
@@ -110,7 +110,7 @@ Building
 ```sh
 ./make.sh                       # all modules, stops at the first failure
 ./make.sh pl_toolbox pl_curl    # only some
-make -C pl_regexp               # a single module (pl_postgresql: see its README)
+make -C pl_regexp               # a single module
 ```
 
 `ci/build.sh` and `ci/test.sh` build everything into `build/stage` and run the

@@ -38,7 +38,8 @@ cp pl_toolbox/src/toolbox.pl pl_toolbox/src/math.pl pl_toolbox/src/string.pl \
 cp pl_toolbox/src/toolbox.qlf pl_regexp/src/regexp.qlf pl_cgi/src/cgi.qlf \
    pl_curl/src/curl.qlf pl_postgresql/src/pgsql.qlf "$sbcl/"
 cp pl_toolbox/libpltoolbox-"$ARCH".a pl_regexp/libplregexp-"$ARCH".a \
-   pl_cgi/libplcgi-"$ARCH".a pl_curl/libplcurl-"$ARCH".a "$gp/"
+   pl_cgi/libplcgi-"$ARCH".a pl_curl/libplcurl-"$ARCH".a \
+   pl_postgresql/libplpgsql-"$ARCH".a "$gp/"
 
 if [ "$init" -eq 1 ]; then
     rc=$HOME/.config/swi-prolog/init.pl

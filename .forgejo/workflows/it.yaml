@@ -37,7 +37,7 @@ jobs:
     # it is reachable under its service name
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: plu
           POSTGRES_PASSWORD: plu

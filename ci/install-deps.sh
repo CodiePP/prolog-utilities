@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs everything needed to build and test all modules on Debian/Ubuntu:
-# toolchain, SWI-Prolog, libcurl, libpq, autotools and GNU Prolog.
+# toolchain, SWI-Prolog, libcurl, libpq and GNU Prolog.
 # Runs as root or through sudo. Used by the GitHub workflows and the
 # Dockerfile.
 #
@@ -21,9 +21,6 @@ $SUDO apt-get update
 $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
-    autoconf \
-    automake \
-    m4 \
     ca-certificates \
     curl \
     swi-prolog-nox \

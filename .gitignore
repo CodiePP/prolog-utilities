@@ -12,4 +12,3 @@ obj-*
 
 # build output
 build/
-pl_postgresql/plpgsql

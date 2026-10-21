@@ -4,8 +4,7 @@
 #   ./make.sh                      all modules
 #   ./make.sh pl_toolbox pl_curl   only these
 #
-# Stops at the first module that fails. pl_postgresql is configured first
-# (autoreconf -fi, ./configure) unless that was done already.
+# Stops at the first module that fails.
 set -eu
 cd "$(dirname "$0")"
 
@@ -22,17 +21,5 @@ fi
 
 for m in "$@"; do
     echo "::: building $m"
-    case "$m" in
-        pl_postgresql)
-            (
-                cd pl_postgresql
-                [ -x configure ] || autoreconf -fi
-                [ -f Makefile ] || ./configure
-                make
-            )
-            ;;
-        *)
-            make -C "$m"
-            ;;
-    esac
+    make -C "$m"
 done

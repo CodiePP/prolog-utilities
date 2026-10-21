@@ -1,16 +1,16 @@
-/*   SWI-Prolog Interface to Postgresql
+/*   Prolog Interface to PostgreSQL -- SWI-Prolog bridge
  *   Copyright (C) 1999-2026  Alexander Diemand
- * 
+ *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
  *   the Free Software Foundation, either version 3 of the License, or
  *   (at your option) any later version.
- *   
+ *
  *   This program is distributed in the hope that it will be useful,
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *   GNU General Public License for more details.
- *   
+ *
  *   You should have received a copy of the GNU General Public License
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -35,17 +35,7 @@
 #ifndef PL_PRUNED
 #define PL_PRUNED PL_CUTTED
 #endif
-#include <libpq-fe.h>
-
-
-/* copied from the python interface, should be defined in a pgsql header instead!! */
-
-#define INT2OID         21
-#define INT4OID         23
-#define OIDOID          26
-#define FLOAT4OID       700
-#define FLOAT8OID       701
-#define CASHOID         790
+#include "pgsql_core.h"
 
 
 /* Prototypes */
@@ -62,12 +52,10 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t h
 
 /* macros */
 
-/* raises error(Formal(Message), context(Name/Arity, _)); who is "Name/Arity".
- * Trailing white space (libpq/regerror messages end with a newline) is removed. */
+/* raises error(Formal(Message), context(Name/Arity, _)); who is "Name/Arity". */
 static int raise_error(const char *formal, const char *msg, const char *who)
 {
 	char name[64];
-	char text[1024];
 	const char *slash = strrchr(who, '/');
 	size_t n = slash ? (size_t)(slash - who) : strlen(who);
 	term_t ex = PL_new_term_ref();
@@ -77,11 +65,6 @@ static int raise_error(const char *formal, const char *msg, const char *who)
 	}
 	memcpy(name, who, n);
 	name[n] = '\0';
-	snprintf(text, sizeof(text), "%s", msg);
-	for (n = strlen(text); n > 0 && (text[n-1] == '\n' || text[n-1] == '\r' || text[n-1] == ' '); n--) {
-		text[n-1] = '\0';
-	}
-	msg = text;
 	if (!PL_unify_term(ex,
 	                   PL_FUNCTOR_CHARS, "error", 2,
 	                     PL_FUNCTOR_CHARS, formal, 1,
@@ -183,10 +166,6 @@ static int get_open_connection(term_t dbx, pq_connection_encoded **pgconn, const
 	{
 		return PL_existence_error("pgsql_connection", dbx);	/* disconnected */
 	}
-	if (PQstatus((*pgconn)->dbx) != CONNECTION_OK)
-	{
-		PLException("pgsql_error", "connection lost", (char *)who);
-	}
 	return TRUE;
 }
 
@@ -208,68 +187,27 @@ install_t install()
 
 foreign_t swi_pgsql_connect1(term_t dbx)
 {
-  char    errmsg[1024];
-  char    *tenv;
-  char 	*hostname;
-  char	*dbname;
-  char	*port;
-  PGconn  *conn;
+  char errbuf[PL_PGSQL_ERRBUF_SIZE];
+  PGconn *conn;
 
   if (PL_term_type(dbx) != PL_VARIABLE)
   {
     PL_fail;
   }
 
-  /* get PGHOST */
-  tenv = getenv("PGHOST");
-  if (!tenv)
-  {
-    snprintf(errmsg, sizeof(errmsg), "environment variable PGHOST is not set");
-    PLException("pgsql_error", errmsg,"pl_pgsql_connect/1");
-  }
-  hostname = tenv;
-
-  /* get PGPORT */
-  tenv = getenv("PGPORT");
-  if (tenv)
-  {
-    port = tenv;
-  } else {
-    port = "5432";
-  }
-
-  /* get PGDATABASE */
-  tenv = getenv("PGDATABASE");
-  if (!tenv)
-  {
-    snprintf (errmsg, sizeof(errmsg), "environment variable PGDATABASE is not set");
-    PLException("pgsql_error", errmsg,"pl_pgsql_connect/1");
-  }
-  dbname = tenv;
-
-  conn = PQsetdb(hostname, port, NULL, NULL, dbname);
+  conn = pgsql_core_connect_env(errbuf);
   if (!conn)
   {
-    return PL_resource_error("memory");
-  }
-
-  /*
-   * check to see that the backend connection was successfully made
-   */
-  if (PQstatus(conn) == CONNECTION_BAD)
-  {
-    snprintf (errmsg, sizeof(errmsg), "connection to database %s failed: %s", dbname, PQerrorMessage(conn));
-    PQfinish(conn);
-    PLException("pgsql_error", errmsg,"pl_pgsql_connect/1");
+    PLException("pgsql_error", errbuf, "pl_pgsql_connect/1");
   }
 
   return unify_connection(dbx, conn);
 }
 
 
-foreign_t swi_pgsql_connect2(term_t p_hostname, term_t p_port, term_t p_user, term_t p_passwd, term_t p_dbname, term_t dbx) 
+foreign_t swi_pgsql_connect2(term_t p_hostname, term_t p_port, term_t p_user, term_t p_passwd, term_t p_dbname, term_t dbx)
 {
-  char	errmsg[1024];
+  char	errbuf[PL_PGSQL_ERRBUF_SIZE];
   char 	*hostname = NULL;
   char	*dbname = NULL;
   char 	*port = NULL;
@@ -295,28 +233,19 @@ foreign_t swi_pgsql_connect2(term_t p_hostname, term_t p_port, term_t p_user, te
     if (!PL_get_chars(p_passwd, &passwd, CVT_ATOM | CVT_STRING | CVT_LIST | BUF_STACK)) { PL_fail; }
   }
 
-  conn = PQsetdbLogin(hostname, port, NULL, NULL, dbname, user, passwd);
+  conn = pgsql_core_connect(hostname, port, user, passwd, dbname, errbuf);
   if (!conn)
   {
-    return PL_resource_error("memory");
-  }
-
-  /*
-   * check to see that the backend connection was successfully made
-   */
-  if (PQstatus(conn) == CONNECTION_BAD)
-  {
-    snprintf (errmsg, sizeof(errmsg), "connection to database %s failed: %s", dbname, PQerrorMessage(conn));
-    PQfinish(conn);
-    PLException("pgsql_error", errmsg,"pl_pgsql_connect/6");
+    PLException("pgsql_error", errbuf, "pl_pgsql_connect/6");
   }
 
   return unify_connection(dbx, conn);
 }
 
 
-foreign_t swi_pgsql_disconnect (term_t dbx) 
+foreign_t swi_pgsql_disconnect (term_t dbx)
 {
+  char errbuf[PL_PGSQL_ERRBUF_SIZE];
   pq_connection_encoded *pgconn = NULL;
 
   if (!get_connection(dbx, &pgconn))
@@ -328,45 +257,12 @@ foreign_t swi_pgsql_disconnect (term_t dbx)
     PL_fail;	/* already disconnected */
   }
 
-  if (PQstatus(pgconn->dbx) == CONNECTION_OK)
+  if (!pgsql_core_disconnect(pgconn->dbx, errbuf))
   {
-    PQfinish(pgconn->dbx);
     pgconn->dbx = NULL;
-  } else {
-    char *typereason;
-    char errmsg[1024];
-    ConnStatusType connstat = PQstatus(pgconn->dbx);
-    switch (connstat) {
-      case CONNECTION_SETENV:
-        typereason="CONNECTION_SETENV";
-        break;
-      case CONNECTION_AUTH_OK:
-        typereason="CONNECTION_AUTH_OK";
-        break;
-      case CONNECTION_AWAITING_RESPONSE:
-        typereason="CONNECTION_AWAITING_RESPONSE";
-        break;
-      case CONNECTION_MADE:
-        typereason="CONNECTION_MADE";
-        break;
-      case CONNECTION_STARTED:
-        typereason="CONNECTION_STARTED";
-        break;
-      case CONNECTION_BAD:
-        typereason="CONNECTION_BAD";
-        break;
-      case CONNECTION_OK:
-        typereason="CONNECTION_OK";
-        break;
-      default:
-        typereason="unknown Connection type reason.";
-        break;
-    };
-    snprintf (errmsg, sizeof(errmsg), "bad connection status: %s", typereason);
-    PQfinish(pgconn->dbx);
-    pgconn->dbx = NULL;
-    PLException("pgsql_error", errmsg,"pl_pgsql_disconnect/1");
+    PLException("pgsql_error", errbuf, "pl_pgsql_disconnect/1");
   }
+  pgconn->dbx = NULL;
   PL_succeed;
 }
 
@@ -442,12 +338,10 @@ static int get_params(term_t params, size_t *nparams, char ***values)
  * Otherwise an exception is raised and FALSE returned. */
 static int exec_query(term_t dbx, term_t query, term_t params, const char *who, PGresult **res)
 {
-  char	errmsg[1024];
+  char	errbuf[PL_PGSQL_ERRBUF_SIZE];
   char	*qstr;
   char	**values = NULL;
   size_t nparams = 0;
-  PGresult *result;
-  ExecStatusType status;
   pq_connection_encoded *pgconn = NULL;
 
   *res = NULL;
@@ -466,28 +360,13 @@ static int exec_query(term_t dbx, term_t query, term_t params, const char *who, 
     return PL_type_error("text", query);
   }
 
-  if (params)
-  {
-    result = PQexecParams(pgconn->dbx, qstr, (int)nparams, NULL,
-                          (const char * const *)values, NULL, NULL, 0);
-  } else {
-    result = PQexec(pgconn->dbx, qstr);
-  }
+  *res = pgsql_core_exec(pgconn->dbx, qstr, (int)nparams, (const char *const *)values, errbuf);
   free_params(values, nparams);
 
-  if (!result)
+  if (!*res)
   {
-    snprintf(errmsg, sizeof(errmsg), "%s", PQerrorMessage(pgconn->dbx));
-    PLException("pgsql_error", errmsg, (char *)who);
+    PLException("pgsql_error", errbuf, (char *)who);
   }
-  status = PQresultStatus(result);
-  if ((status != PGRES_COMMAND_OK) && (status != PGRES_TUPLES_OK))
-  {
-    snprintf(errmsg, sizeof(errmsg), "%s: %s", PQresStatus(status), PQresultErrorMessage(result));
-    PQclear(result);
-    PLException("pgsql_error", errmsg, (char *)who);
-  }
-  *res = result;
   return TRUE;
 }
 
@@ -543,16 +422,11 @@ int unify_result_row(PGresult *result, int nfields, int idx, term_t out_row)
       continue;
     }
     tchar = PQgetvalue(result, idx, fnum);
-    /* printf ("got: type %d  value %s\n", PQftype((*result),fnum), tchar);  */
-    switch (PQftype(result, fnum)) {
-        case INT2OID:
-        case INT4OID:
-        case OIDOID:
+    switch (pgsql_core_cell_kind_of(result, fnum)) {
+        case PL_PGSQL_CELL_INT:
                 if (!PL_unify_integer(val, strtol(tchar,NULL,10))) { return FALSE; }
                 break;
-        case FLOAT4OID:
-        case FLOAT8OID:
-        case CASHOID:
+        case PL_PGSQL_CELL_FLOAT:
                 if (!PL_unify_float(val, strtod(tchar,NULL))) { return FALSE; }
                 break;
         default:
@@ -586,8 +460,6 @@ static int query_all(term_t dbx, term_t query, term_t params, term_t out_res, co
   }
   int nfields = PQnfields(pqres);
 
-  //fprintf(stderr, "Result rows: %d fields: %d\n", nrows, nfields);
-
   term_t row = PL_new_term_ref();
   term_t lst = PL_copy_term_ref(out_res);
 
@@ -606,23 +478,23 @@ static int query_all(term_t dbx, term_t query, term_t params, term_t out_res, co
   return PL_unify_nil(lst);
 }
 
-foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res) 
+foreign_t swi_pgsql_query_all (term_t dbx, term_t query, term_t out_res)
 {
   return query_all(dbx, query, 0, out_res, "pl_pgsql_query_all/3");
 }
 
-foreign_t swi_pgsql_query_all_params (term_t dbx, term_t query, term_t params, term_t out_res) 
+foreign_t swi_pgsql_query_all_params (term_t dbx, term_t query, term_t params, term_t out_res)
 {
   return query_all(dbx, query, params, out_res, "pl_pgsql_query_all/4");
 }
-    
 
-foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t handle) 
+
+foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t handle)
 {
   pq_result_encoded *result;
 
   switch (PL_foreign_control(handle))
-  { 
+  {
     case PL_FIRST_CALL:
       {
         PGresult   *pqres;
@@ -664,8 +536,6 @@ foreign_t swi_pgsql_query2 (term_t dbx, term_t query, term_t my_res, control_t h
       free(result);
       PL_succeed;
   }
-
-  /* fprintf(stderr, "Result rows: %d fields: %d\n", nrows, nfields); */
 
   if (!unify_result_row(result->result, result->nfields, result->atrow, my_res))
   {

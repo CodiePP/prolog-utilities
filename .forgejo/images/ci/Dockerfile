@@ -11,7 +11,7 @@
 FROM debian:bookworm-slim
 
 LABEL org.opencontainers.image.title="prolog-utilities CI" \
-      org.opencontainers.image.description="SWI-Prolog, GNU Prolog, libcurl, libpq and autotools for building and testing prolog-utilities"
+      org.opencontainers.image.description="SWI-Prolog, GNU Prolog, libcurl and libpq for building and testing prolog-utilities"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -19,9 +19,6 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         pkg-config \
-        autoconf \
-        automake \
-        m4 \
         nodejs \
         git \
         curl \

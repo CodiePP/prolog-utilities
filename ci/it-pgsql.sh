@@ -4,7 +4,7 @@
 # the libpq variables PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE.
 # In CI the server is the `postgres` service container of the job; locally:
 #
-#   docker run --rm -d --name plu-pg -p 5432:5432 -e POSTGRES_PASSWORD=plu postgres:16
+#   docker run --rm -d --name plu-pg -p 5432:5432 -e POSTGRES_PASSWORD=plu postgres:17
 #   PGHOST=localhost PGUSER=postgres PGPASSWORD=plu PGDATABASE=postgres ci/it-pgsql.sh
 set -eu
 cd "$(dirname "$0")/.."
