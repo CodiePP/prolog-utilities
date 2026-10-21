@@ -15,3 +15,4 @@ if [ "${2:-}" = "--push" ]; then
     ACT="--push"
 fi
 docker buildx build --platform linux/amd64,linux/arm64 -t "$image" -f .forgejo/images/ci/Dockerfile .forgejo/images/ci ${ACT}
+

@@ -5,6 +5,13 @@ All notable changes. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+0.2.2 - 2026-10-21
+------------------
+
+* in `pl_postgresql` the implementation also works with GNU Prolog
+* PostgreSQL 17 is used everywhere
+
+
 0.2.0 - 2026-10-08
 ------------------
 
