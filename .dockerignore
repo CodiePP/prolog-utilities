@@ -13,8 +13,7 @@ build
 **/top
 **/*.cgi
 pl_curl/test-gp
-# pl_postgresql is configured inside the image
-pl_postgresql/Makefile
+# stale autoconf output from before pl_postgresql used mk/common.mk
 pl_postgresql/configure
 pl_postgresql/config
 pl_postgresql/config.*
