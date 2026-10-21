@@ -18,9 +18,19 @@ jobs:
         password: ${{ secrets.REGISTRY_TOKEN }}
     steps:
       - name: Check out repository code
-        uses: https://data.forgejo.org/actions/checkout@v4
-        with:
-          submodules: false
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          # plain git instead of actions/checkout: no action clone, no node
+          if [ -n "$TOKEN" ]; then
+            export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraheader
+            export GIT_CONFIG_VALUE_0="Authorization: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          fi
+          git init .
+          git fetch --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
+          git -c advice.detachedHead=false checkout FETCH_HEAD
+          git log -1 --format="checked out %H%n  %s%n  %an, %ci"
+          echo "  $(git ls-files | wc -l) files"
       - name: Build
         run: ci/build.sh
       - name: pl_curl against the Prolog fixture server
@@ -54,7 +64,20 @@ jobs:
       PGPASSWORD: plu
       PGDATABASE: plu
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository code
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          # plain git instead of actions/checkout: no action clone, no node
+          if [ -n "$TOKEN" ]; then
+            export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraheader
+            export GIT_CONFIG_VALUE_0="Authorization: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+          fi
+          git init .
+          git fetch --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
+          git -c advice.detachedHead=false checkout FETCH_HEAD
+          git log -1 --format="checked out %H%n  %s%n  %an, %ci"
+          echo "  $(git ls-files | wc -l) files"
       - name: Build
         run: ci/build.sh
       - name: pl_postgresql against the PostgreSQL service
