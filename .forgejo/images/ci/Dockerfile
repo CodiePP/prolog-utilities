@@ -33,6 +33,21 @@ RUN apt-get update && \
         postgresql-client \
  && rm -rf /var/lib/apt/lists/*
 
+# bookworm's docker.io has no buildx plugin (docker-buildx is trixie+), but
+# image.yaml runs `docker buildx` in this image. Pinned, checksum verified.
+ARG BUILDX_VERSION=0.38.1
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+        amd64) sum=e25d5cd675092bb5d1d03632fdc46cdf3fede7b514dc5f023a105e00d3ce5ad4 ;; \
+        arm64) sum=3b83b3731916ba433feccaaa689fe5bcdc81c641d92c8e6c2ea865dfa141c97a ;; \
+        *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    mkdir -p /usr/libexec/docker/cli-plugins && \
+    curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-buildx \
+        "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${TARGETARCH}" && \
+    echo "${sum}  /usr/libexec/docker/cli-plugins/docker-buildx" | sha256sum -c - && \
+    chmod 755 /usr/libexec/docker/cli-plugins/docker-buildx
+
  ARG GPROLOG_VERSION=1.5.0
  RUN wget -q https://ftp.gnu.org/gnu/gprolog/gprolog-${GPROLOG_VERSION}.tar.gz && \
      tar xzf gprolog-${GPROLOG_VERSION}.tar.gz && \

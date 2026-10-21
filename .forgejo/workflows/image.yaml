@@ -68,7 +68,11 @@ jobs:
           echo "docker daemon never became reachable"; exit 1
           
       - name: Set up Docker Buildx
-        run: docker buildx create --name multiarch-builder --driver docker-container --use && docker buildx inspect --bootstrap
+        run: |
+          # without the plugin docker misparses this as `docker --name` ("unknown flag: --name")
+          docker buildx version || { echo "docker buildx plugin missing in ${{ vars.CI_IMAGE }}; rebuild it with ci/build-image.sh"; exit 1; }
+          docker buildx create --name multiarch-builder --driver docker-container --use 2>/dev/null || docker buildx use multiarch-builder
+          docker buildx inspect --bootstrap
 
       - name: Build and push
         env:
