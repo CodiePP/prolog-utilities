@@ -30,5 +30,9 @@
 '$info_curl' :- info_curl.
 
 module(curl, '$info_curl', [
-		pl_curl_get/5
+		pl_curl_get/5,
+		pl_curl_ws_open/3,
+		pl_curl_ws_send/2,
+		pl_curl_ws_recv/3,
+		pl_curl_ws_close/1
 	]).

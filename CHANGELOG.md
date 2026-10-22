@@ -5,6 +5,20 @@ All notable changes. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+Unreleased
+----------
+
+### Added
+
+* pl_curl: WebSocket clients for SWI-Prolog and GNU Prolog:
+  `pl_curl_ws_open/3`, `pl_curl_ws_send/2`, `pl_curl_ws_recv/3` (with a
+  timeout; fragments joined, pings answered) and `pl_curl_ws_close/1`.
+  Needs libcurl >= 8.11.0 with WebSocket support, checked at run time.
+* Integration tests for them in SWI-Prolog (`pl_curl/test/it_curl_ws.plt`)
+  and GNU Prolog (`pl_curl/test/it_curl_ws_gp.pl`), run by `ci/it-curl.sh`
+  against new `/ws/...` endpoints of the test fixture.
+
+
 0.2.2 - 2026-10-21
 ------------------
 

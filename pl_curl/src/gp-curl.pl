@@ -23,6 +23,11 @@
 
 :- foreign(pl_curl_init).
 :- foreign(pl_curl_get(+term, +term, term, term, term)).
+% the C names differ from the predicate names, which the shared core uses
+:- foreign(pl_curl_ws_open(+term, +term, term), [fct_name(gp_curl_ws_open)]).
+:- foreign(pl_curl_ws_send(+term, +term), [fct_name(gp_curl_ws_send)]).
+:- foreign(pl_curl_ws_recv(+term, +term, term), [fct_name(gp_curl_ws_recv)]).
+:- foreign(pl_curl_ws_close(+term), [fct_name(gp_curl_ws_close)]).
 
 :- initialization(pl_curl_init).
 
@@ -32,4 +37,11 @@ info_curl :- write('Prolog libcurl (HTTP) Interface'),nl,
              write('           basic_auth(User,Pass), bearer_auth(Token),'),nl,
              write('           timeout(Secs), connect_timeout(Secs), max_body(Bytes),'),nl,
              write('           body_as(atom|codes),'),nl,
-             write('           follow_redirect(Bool), ssl_verify(Bool), user_agent(Atom)'),nl.
+             write('           follow_redirect(Bool), ssl_verify(Bool), user_agent(Atom)'),nl,
+             write('pl_curl_ws_open(URL, Options, WS)'),nl,
+             write('  Options: header(Name,Value), connect_timeout(Secs), max_message(Bytes),'),nl,
+             write('           text_as(codes|atom), ssl_verify(Bool), user_agent(Atom)'),nl,
+             write('pl_curl_ws_send(WS, Text | binary(Bytes))'),nl,
+             write('pl_curl_ws_recv(WS, TimeoutMs, Msg)'),nl,
+             write('  Msg: text(Data), binary(Bytes), close(Code,Reason) or timeout'),nl,
+             write('pl_curl_ws_close(WS)'),nl.

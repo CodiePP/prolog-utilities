@@ -13,7 +13,7 @@ bridge and/or Prolog code, built for both Prolog systems where possible.
 | [pl_toolbox](pl_toolbox) | JSON parser/encoder, strings, streams, maths, vectors, safe temporary files | yes | yes (no temp files) | |
 | [pl_regexp](pl_regexp) | POSIX extended regular expressions: `pl_regexp/3` | yes | yes | libc `<regex.h>` |
 | [pl_cgi](pl_cgi) | CGI requests, cookies, HTML templates with escaping | yes | yes | pl_toolbox, pl_regexp |
-| [pl_curl](pl_curl) | HTTP(S) GET with parameters, headers, auth, limits: `pl_curl_get/5` | yes | yes | libcurl |
+| [pl_curl](pl_curl) | HTTP(S) GET with parameters, headers, auth, limits: `pl_curl_get/5`; WebSocket clients: `pl_curl_ws_open/3` etc. | yes | yes | libcurl (>= 8.11 for WebSockets) |
 | [pl_postgresql](pl_postgresql) | PostgreSQL queries, parameterised statements | yes | yes | libpq |
 
 Supported platforms: Linux and macOS.

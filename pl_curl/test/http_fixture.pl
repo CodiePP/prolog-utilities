@@ -14,6 +14,18 @@
 %   /file           302 to file:///etc/passwd (redirect protocol restriction)
 %   /conn           text/plain id of the TCP connection (keep-alive tests)
 %   /binary         application/octet-stream body: bytes 97, 0, 98, 255
+%
+% WebSocket endpoints (ws://127.0.0.1:Port/ws/...):
+%   /ws/echo        echoes text and binary messages, closes when the client does
+%   /ws/headers     sends one text message: Name=Value lines of the handshake's
+%                   user agent and X-Test header, then echoes like /ws/echo
+%   /ws/fragmented  sends "part1-part2-part3" as one message in three fragments
+%   /ws/big         sends one text message of 100000 'x'
+%   /ws/oversize    sends one text message of 5000 'x' (for max_message limits)
+%   /ws/unicode     sends the text "Gr\u00FC\u00DFe " followed by U+1F600
+%   /ws/close       closes at once with status 4001 and reason "bye"
+%   /ws/silent      sends nothing (receive timeouts)
+%   /ws/ping        sends a ping, then the text "pong received" once the pong arrives
 
 :- encoding(utf8).
 
@@ -21,6 +33,7 @@
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_header)).
+:- use_module(library(http/websocket)).
 
 :- http_handler(root(get),      handle_get,      []).
 :- http_handler(root(status),   handle_status,   [prefix]).
@@ -32,6 +45,15 @@
 :- http_handler(root(file),     handle_file,     []).
 :- http_handler(root(conn),     handle_conn,     []).
 :- http_handler(root(binary),   handle_binary,   []).
+:- http_handler(root(ws/echo),       http_upgrade_to_websocket(ws_echo, []),       [spawn([])]).
+:- http_handler(root(ws/headers),    ws_headers,                                    [spawn([])]).
+:- http_handler(root(ws/fragmented), ws_fragmented,                              [spawn([])]).
+:- http_handler(root(ws/big),        http_upgrade_to_websocket(ws_big, []),        [spawn([])]).
+:- http_handler(root(ws/oversize),    http_upgrade_to_websocket(ws_oversize, []),    [spawn([])]).
+:- http_handler(root(ws/unicode),    http_upgrade_to_websocket(ws_unicode, []),    [spawn([])]).
+:- http_handler(root(ws/close),      http_upgrade_to_websocket(ws_close, []),      [spawn([])]).
+:- http_handler(root(ws/silent),     http_upgrade_to_websocket(ws_echo, []),       [spawn([])]).
+:- http_handler(root(ws/ping),       http_upgrade_to_websocket(ws_ping, []),       [spawn([])]).
 
 handle_get(Request) :-
     ( memberchk(search(Search), Request) -> true ; Search = [] ),
@@ -100,6 +122,93 @@ handle_binary(_Request) :-
     format('Content-type: application/octet-stream~n~n'),
     set_stream(current_output, encoding(octet)),
     format('~s', [[97, 0, 98, 255]]).
+
+% --- WebSockets -----------------------------------------------------------
+
+ws_echo(WS) :-
+    ws_receive(WS, Msg, [format(string)]),
+    (   Msg.opcode == close
+    ->  catch(ws_close(WS, 1000, ""), _, true)
+    ;   memberchk(Msg.opcode, [text, binary])
+    ->  ws_send(WS, Msg),
+        ws_echo(WS)
+    ;   ws_echo(WS)
+    ).
+
+ws_headers(Request) :-
+    ( memberchk(user_agent(UA), Request) -> true ; UA = '' ),
+    ( memberchk(x_test(XT), Request) -> true ; XT = '' ),
+    format(string(Text), "user_agent=~w~nx_test=~w", [UA, XT]),
+    http_upgrade_to_websocket(ws_headers_then_echo(Text), [], Request).
+
+ws_headers_then_echo(Text, WS) :-
+    ws_send(WS, text(Text)),
+    ws_echo(WS).
+
+% library(http/websocket) sends every message as one frame, so this
+% handler does the handshake itself and writes the frames by hand: a text
+% frame without FIN, a continuation frame without FIN, a final continuation
+% frame. Then it waits for the client to close.
+ws_fragmented(Request) :-
+    memberchk(sec_websocket_key(Key), Request),
+    websocket:sec_websocket_accept(_{key:Key}, Accept),
+    http_switch_protocol(ws_write_fragments,
+                         [ header([ upgrade(websocket),
+                                    connection('Upgrade'),
+                                    sec_websocket_accept(Accept)
+                                  ])
+                         ]).
+
+ws_write_fragments(In, Out) :-
+    set_stream(Out, encoding(octet)),
+    ws_frame(Out, 0x01, "part1-"),       % text, more to come
+    ws_frame(Out, 0x00, "part2-"),       % continuation, more to come
+    ws_frame(Out, 0x80, "part3"),        % continuation, final
+    flush_output(Out),
+    set_stream(In, encoding(octet)),
+    catch(read_until_eof(In), _, true),
+    close(Out, [force(true)]).
+
+ws_frame(Out, Byte0, Text) :-
+    string_codes(Text, Payload),
+    length(Payload, Len),
+    put_byte(Out, Byte0),
+    put_byte(Out, Len),                  % unmasked, short payload
+    maplist(put_byte(Out), Payload).
+
+read_until_eof(In) :-
+    get_byte(In, B),
+    ( B == -1 -> true ; read_until_eof(In) ).
+
+ws_big(WS) :-
+    ws_send_xs(WS, 100000).
+
+% small enough to sit in the socket buffer: a client that rejects it
+% (max_message) and disconnects does not break the server's write
+ws_oversize(WS) :-
+    ws_send_xs(WS, 5000).
+
+ws_send_xs(WS, N) :-
+    length(Cs, N), maplist(=(0'x), Cs), string_codes(S, Cs),
+    ws_send(WS, text(S)),
+    ws_echo(WS).
+
+ws_unicode(WS) :-
+    format(string(S), 'Gr~c~ce ~c', [252, 223, 128512]),
+    ws_send(WS, text(S)),
+    ws_echo(WS).
+
+ws_close(WS) :-
+    ws_close(WS, 4001, "bye").
+
+ws_ping(WS) :-
+    ws_send(WS, ping("are you there")),
+    ws_receive(WS, Msg, []),
+    (   Msg.opcode == pong
+    ->  ws_send(WS, text("pong received"))
+    ;   ws_send(WS, text(unexpected(Msg.opcode)))
+    ),
+    ws_echo(WS).
 
 main :-
     current_prolog_flag(argv, Argv),

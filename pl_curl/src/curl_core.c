@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <poll.h>
+#include <time.h>
 
 #include "curl_core.h"
 
@@ -436,4 +438,382 @@ void pl_curl_response_free(pl_curl_response *resp)
   resp->n_headers = 0;
   resp->body = NULL;
   resp->body_len = 0;
+}
+
+
+
+/* WebSockets */
+
+struct pl_curl_ws {
+  CURL *curl;
+  struct curl_slist *slist;      /* handshake headers, alive as long as curl */
+  int usable;                    /* 0 after an error or a close from the server */
+  int closed_by_server;
+  struct growbuf msg;            /* message being assembled */
+  int msg_started;
+  enum pl_curl_ws_kind msg_kind;
+};
+
+#if LIBCURL_VERSION_NUM >= 0x075600   /* 7.86.0: curl_ws_* in the headers */
+
+/* WebSocket support of the library loaded at run time; 0 and errbuf set if missing */
+static int ws_supported(char *errbuf)
+{
+  const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
+  const char *const *p;
+
+  if (vi->version_num < PL_CURL_WS_MIN_VERSION_NUM) {
+    snprintf(errbuf, CURL_ERROR_SIZE, "WebSockets need libcurl >= %s, found %s",
+             PL_CURL_WS_MIN_VERSION, vi->version);
+    return 0;
+  }
+  for (p = vi->protocols; p && *p; p++) {
+    if (strcmp(*p, "ws") == 0) {
+      return 1;
+    }
+  }
+  snprintf(errbuf, CURL_ERROR_SIZE, "libcurl %s was built without WebSocket support",
+           vi->version);
+  return 0;
+}
+
+static long now_ms(void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (long)ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+}
+
+/* waits until the connection's socket is readable (POLLIN) or writable
+ * (POLLOUT) or timeout_ms has passed; returns 0 on a socket error */
+static int ws_wait(pl_curl_ws *ws, short events, long timeout_ms)
+{
+  curl_socket_t sock = CURL_SOCKET_BAD;
+  struct pollfd pfd;
+
+  if (curl_easy_getinfo(ws->curl, CURLINFO_ACTIVESOCKET, &sock) != CURLE_OK ||
+      sock == CURL_SOCKET_BAD) {
+    return 0;
+  }
+  pfd.fd = sock;
+  pfd.events = events;
+  pfd.revents = 0;
+  if (poll(&pfd, 1, timeout_ms < 0 ? 0 : (int)timeout_ms) < 0) {
+    return 0;
+  }
+  return 1;
+}
+
+static void ws_fail(pl_curl_ws *ws, char *errbuf, const char *what, CURLcode rc)
+{
+  ws->usable = 0;
+  snprintf(errbuf, CURL_ERROR_SIZE, "%s: %s", what, curl_easy_strerror(rc));
+}
+
+pl_curl_ws *pl_curl_ws_open(const pl_curl_ws_request *req, char *errbuf)
+{
+  pl_curl_ws *ws;
+  CURLcode rc;
+  long status = 0;
+  long connect_timeout = req->connect_timeout_sec > 0 ? req->connect_timeout_sec
+                                                      : PL_CURL_DEFAULT_CONNECT_TIMEOUT;
+  int i;
+
+  errbuf[0] = '\0';
+  if (!ws_supported(errbuf)) {
+    return NULL;
+  }
+  for (i = 0; i < req->n_headers; i++) {
+    if (has_crlf(req->headers[i].name) || has_crlf(req->headers[i].value) ||
+        strchr(req->headers[i].name, ':')) {
+      snprintf(errbuf, CURL_ERROR_SIZE, "invalid header name or value: %s", req->headers[i].name);
+      return NULL;
+    }
+  }
+  if (has_crlf(req->user_agent)) {
+    snprintf(errbuf, CURL_ERROR_SIZE, "CR/LF not allowed in user agent");
+    return NULL;
+  }
+
+  ws = (pl_curl_ws *)calloc(1, sizeof(*ws));
+  if (!ws || !(ws->curl = curl_easy_init())) {
+    free(ws);
+    snprintf(errbuf, CURL_ERROR_SIZE, "curl_easy_init failed");
+    return NULL;
+  }
+  ws->msg.max = (size_t)(req->max_message > 0 ? req->max_message : PL_CURL_DEFAULT_MAX_MESSAGE);
+
+  for (i = 0; i < req->n_headers; i++) {
+    if (!slist_append3(&ws->slist, req->headers[i].name, ": ", req->headers[i].value)) {
+      snprintf(errbuf, CURL_ERROR_SIZE, "out of memory building request headers");
+      pl_curl_ws_free(ws);
+      return NULL;
+    }
+  }
+
+  /* a handle of its own: the per-thread handle of pl_curl_get_perform is
+   * reset after every request, a WebSocket stays open */
+  curl_easy_setopt(ws->curl, CURLOPT_URL, req->url);
+  curl_easy_setopt(ws->curl, CURLOPT_CONNECT_ONLY, 2L);   /* upgrade, then hand over */
+  curl_easy_setopt(ws->curl, CURLOPT_PROTOCOLS_STR, "ws,wss");
+  curl_easy_setopt(ws->curl, CURLOPT_ERRORBUFFER, errbuf);
+  curl_easy_setopt(ws->curl, CURLOPT_NOSIGNAL, 1L);
+  curl_easy_setopt(ws->curl, CURLOPT_SSL_VERIFYPEER, req->ssl_verify ? 1L : 0L);
+  curl_easy_setopt(ws->curl, CURLOPT_SSL_VERIFYHOST, req->ssl_verify ? 2L : 0L);
+  curl_easy_setopt(ws->curl, CURLOPT_CONNECTTIMEOUT, connect_timeout);
+  /* bounds the handshake as well; with CONNECT_ONLY it ends there */
+  curl_easy_setopt(ws->curl, CURLOPT_TIMEOUT, connect_timeout);
+  if (req->user_agent) {
+    curl_easy_setopt(ws->curl, CURLOPT_USERAGENT, req->user_agent);
+  }
+  if (ws->slist) {
+    curl_easy_setopt(ws->curl, CURLOPT_HTTPHEADER, ws->slist);
+  }
+
+  rc = curl_easy_perform(ws->curl);
+  curl_easy_setopt(ws->curl, CURLOPT_ERRORBUFFER, NULL);   /* errbuf belongs to the caller */
+  curl_easy_setopt(ws->curl, CURLOPT_TIMEOUT, 0L);          /* the connection itself is long-lived */
+  if (rc != CURLE_OK) {
+    if (errbuf[0] == '\0') {
+      snprintf(errbuf, CURL_ERROR_SIZE, "%s", curl_easy_strerror(rc));
+    }
+    ws->usable = 0;
+    pl_curl_ws_free(ws);
+    return NULL;
+  }
+  curl_easy_getinfo(ws->curl, CURLINFO_RESPONSE_CODE, &status);
+  if (status != 101) {
+    snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket handshake refused: HTTP status %ld", status);
+    ws->usable = 0;
+    pl_curl_ws_free(ws);
+    return NULL;
+  }
+  ws->usable = 1;
+  return ws;
+}
+
+/* sends one complete frame of the given type */
+static int ws_send_frame(pl_curl_ws *ws, const char *data, size_t len, unsigned int flags,
+                         char *errbuf)
+{
+  size_t off = 0;
+  long deadline = now_ms() + PL_CURL_DEFAULT_CONNECT_TIMEOUT * 1000L;
+
+  for (;;) {
+    size_t sent = 0;
+    CURLcode rc = curl_ws_send(ws->curl, data + off, len - off, &sent, 0, flags);
+    off += sent;
+    if (rc == CURLE_OK && off >= len) {
+      return 1;
+    }
+    if (rc != CURLE_OK && rc != CURLE_AGAIN) {
+      ws_fail(ws, errbuf, "WebSocket send failed", rc);
+      return 0;
+    }
+    if (now_ms() > deadline) {
+      ws->usable = 0;
+      snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket send timed out");
+      return 0;
+    }
+    if (!ws_wait(ws, POLLOUT, 1000)) {
+      ws->usable = 0;
+      snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket send failed: socket error");
+      return 0;
+    }
+  }
+}
+
+/* sends a close frame with the given status code (none if code is 1005),
+ * best effort: errors are ignored, the connection is done either way */
+static void ws_send_close(pl_curl_ws *ws, int code)
+{
+  char payload[2];
+  char ignore[CURL_ERROR_SIZE];
+
+  payload[0] = (char)((code >> 8) & 0xff);
+  payload[1] = (char)(code & 0xff);
+  ws_send_frame(ws, payload, code == 1005 ? 0 : 2, CURLWS_CLOSE, ignore);
+}
+
+int pl_curl_ws_send(pl_curl_ws *ws, const char *data, size_t len, int binary, char *errbuf)
+{
+  errbuf[0] = '\0';
+  if (!ws->usable) {
+    snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket connection is closed");
+    return 0;
+  }
+  return ws_send_frame(ws, data, len, binary ? CURLWS_BINARY : CURLWS_TEXT, errbuf);
+}
+
+/* hands the assembled message over to msg */
+static void ws_take_message(pl_curl_ws *ws, pl_curl_ws_msg *msg)
+{
+  msg->kind = ws->msg_kind;
+  msg->data = ws->msg.data ? ws->msg.data : (char *)calloc(1, 1);
+  msg->len = ws->msg.len;
+  ws->msg.data = NULL;
+  ws->msg.len = ws->msg.cap = 0;
+  ws->msg.too_big = 0;
+  ws->msg_started = 0;
+}
+
+int pl_curl_ws_recv(pl_curl_ws *ws, long timeout_ms, pl_curl_ws_msg *msg, char *errbuf)
+{
+  long deadline = now_ms() + (timeout_ms > 0 ? timeout_ms : 0);
+  char buf[16384];
+
+  memset(msg, 0, sizeof(*msg));
+  errbuf[0] = '\0';
+  if (!ws->usable) {
+    snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket connection is closed");
+    return 0;
+  }
+
+  for (;;) {
+    size_t n = 0;
+    const struct curl_ws_frame *meta = NULL;
+    CURLcode rc = curl_ws_recv(ws->curl, buf, sizeof(buf), &n, &meta);
+
+    if (rc == CURLE_AGAIN) {
+      long left = deadline - now_ms();
+      if (left <= 0) {
+        msg->kind = PL_CURL_WS_TIMEOUT;
+        return 1;
+      }
+      if (!ws_wait(ws, POLLIN, left)) {
+        ws->usable = 0;
+        snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket receive failed: socket error");
+        return 0;
+      }
+      continue;
+    }
+    if (rc != CURLE_OK) {
+      ws_fail(ws, errbuf, "WebSocket receive failed", rc);
+      return 0;
+    }
+    if (!meta) {
+      continue;
+    }
+
+    if (meta->flags & CURLWS_CLOSE) {
+      /* payload: 2-byte status code and an optional reason; may span several reads */
+      if (!ws->msg_started) {
+        ws->msg_started = 1;
+        ws->msg_kind = PL_CURL_WS_CLOSE;
+      }
+      if (n > 0 && !growbuf_append(&ws->msg, buf, n)) {
+        ws->msg.len = 0;   /* an oversized close reason is dropped */
+      }
+      if (meta->bytesleft > 0) {
+        continue;
+      }
+      msg->kind = PL_CURL_WS_CLOSE;
+      msg->close_code = 1005;
+      if (ws->msg.len >= 2) {
+        msg->close_code = ((unsigned char)ws->msg.data[0] << 8) | (unsigned char)ws->msg.data[1];
+        msg->len = ws->msg.len - 2;
+        msg->data = (char *)malloc(msg->len + 1);
+        if (msg->data) {
+          memcpy(msg->data, ws->msg.data + 2, msg->len);
+          msg->data[msg->len] = '\0';
+        } else {
+          msg->len = 0;
+        }
+      }
+      if (!msg->data) {
+        msg->data = (char *)calloc(1, 1);
+      }
+      free(ws->msg.data);
+      ws->msg.data = NULL;
+      ws->msg.len = ws->msg.cap = 0;
+      ws->msg_started = 0;
+      /* answer the close as the protocol asks, then the connection is done */
+      ws_send_close(ws, msg->close_code);
+      ws->usable = 0;
+      ws->closed_by_server = 1;
+      return 1;
+    }
+    if (meta->flags & (CURLWS_PING | CURLWS_PONG)) {
+      continue;   /* libcurl answers pings itself (not in raw mode) */
+    }
+    if (meta->flags & (CURLWS_TEXT | CURLWS_BINARY)) {
+      if (!ws->msg_started) {
+        ws->msg_started = 1;
+        ws->msg_kind = (meta->flags & CURLWS_BINARY) ? PL_CURL_WS_BINARY : PL_CURL_WS_TEXT;
+      }
+      if (n > 0 && !growbuf_append(&ws->msg, buf, n)) {
+        ws->usable = 0;
+        if (ws->msg.too_big) {
+          snprintf(errbuf, CURL_ERROR_SIZE,
+                   "WebSocket message exceeds the limit of %lu bytes", (unsigned long)ws->msg.max);
+        } else {
+          snprintf(errbuf, CURL_ERROR_SIZE, "out of memory receiving a WebSocket message");
+        }
+        return 0;
+      }
+      /* complete: last part of a frame that is not followed by more fragments */
+      if (meta->bytesleft == 0 && !(meta->flags & CURLWS_CONT)) {
+        ws_take_message(ws, msg);
+        return 1;
+      }
+    }
+  }
+}
+
+#else  /* libcurl headers without WebSocket API */
+
+pl_curl_ws *pl_curl_ws_open(const pl_curl_ws_request *req, char *errbuf)
+{
+  snprintf(errbuf, CURL_ERROR_SIZE, "pl_curl was compiled against libcurl %s, "
+           "WebSockets need libcurl >= %s", LIBCURL_VERSION, PL_CURL_WS_MIN_VERSION);
+  return NULL;
+}
+
+int pl_curl_ws_send(pl_curl_ws *ws, const char *data, size_t len, int binary, char *errbuf)
+{
+  snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket connection is closed");
+  return 0;
+}
+
+int pl_curl_ws_recv(pl_curl_ws *ws, long timeout_ms, pl_curl_ws_msg *msg, char *errbuf)
+{
+  memset(msg, 0, sizeof(*msg));
+  snprintf(errbuf, CURL_ERROR_SIZE, "WebSocket connection is closed");
+  return 0;
+}
+
+static void ws_send_close(pl_curl_ws *ws, int code)
+{
+}
+
+#endif
+
+void pl_curl_ws_msg_free(pl_curl_ws_msg *msg)
+{
+  free(msg->data);
+  msg->data = NULL;
+  msg->len = 0;
+}
+
+int pl_curl_ws_usable(const pl_curl_ws *ws)
+{
+  return ws && ws->usable;
+}
+
+void pl_curl_ws_free(pl_curl_ws *ws)
+{
+  if (!ws) {
+    return;
+  }
+  if (ws->curl) {
+    if (ws->usable) {
+      ws_send_close(ws, 1000);   /* normal closure */
+    }
+    curl_easy_cleanup(ws->curl);
+  }
+  if (ws->slist) {
+    curl_slist_free_all(ws->slist);
+  }
+  free(ws->msg.data);
+  free(ws);
 }
