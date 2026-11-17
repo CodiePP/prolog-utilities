@@ -89,7 +89,7 @@ Requirements
 
 | dependency | minimum | tested with | needed by |
 |---|---|---|---|
-| SWI-Prolog (headers + `swipl`) | 8.0 | 8.5.12, 9.0.4, 9.2.9 | SWI-Prolog builds of all modules |
+| SWI-Prolog (headers + `swipl`) | 8.0 | 8.5.12, 9.0.4, 9.2.9, 10.0.2 | SWI-Prolog builds of all modules |
 | GNU Prolog (`gplc`) | 1.4.0 | 1.5.0 | GNU Prolog builds (`pl_toolbox`, `pl_regexp`, `pl_cgi`, `pl_curl`, `pl_postgresql`) |
 | libcurl (headers + library) | 7.58.0 | 8.5.0, 8.7.1, 8.14.1 | `pl_curl` |
 | libpq (PostgreSQL client) | 9.0 | 16, 17 | `pl_postgresql` |

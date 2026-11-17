@@ -5,6 +5,13 @@ All notable changes. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+0.2.4 - 2026-11-17
+------------------
+
+* update Debian 13 version
+* package: build SWI Prolog v10.0.2 from source
+
+
 0.2.3 - 2026-10-22
 ------------------
 
