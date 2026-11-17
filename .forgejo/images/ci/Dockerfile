@@ -21,7 +21,13 @@ COPY install-deps.sh /tmp/install-deps.sh
 RUN /tmp/install-deps.sh \
  && apt-get install -y --no-install-recommends \
         nodejs \
-        git \
+        git git-lfs \
         docker-cli \
         docker-buildx \
  && rm -rf /var/lib/apt/lists/* /tmp/install-deps.sh
+
+# The built GNU Prolog libraries (libpltoolbox-Linux.a, libplregexp-Linux.a, ...)
+# from the published image, for projects that link them with gplc and run in
+# this image. The same per-architecture build is used on amd64 and arm64.
+# Needs ghcr.io/codiepp/prolog-utilities to be published before this image is built.
+COPY --from=ghcr.io/codiepp/prolog-utilities:latest /home/user/lib/gprolog /opt/lib/gprolog

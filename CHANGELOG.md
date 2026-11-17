@@ -4,6 +4,15 @@ Changelog
 All notable changes. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+0.2.5 - unpublished
+-------------------
+
+* image `prolog-utilities`: add `nodejs` and `git`, so it can be the job
+  container of Forgejo/GitHub workflows (the checkout action needs them)
+* image `prolog-utilities-ci`: add the built GNU Prolog libraries in
+  `/opt/lib/gprolog` (copied from the `prolog-utilities` image), so projects
+  can link `libpltoolbox` and `libplregexp` with `gplc` in this image
+
 
 0.2.4 - 2026-11-17
 ------------------

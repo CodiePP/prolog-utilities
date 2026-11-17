@@ -51,7 +51,8 @@ docker run --rm -it ghcr.io/codiepp/prolog-utilities   # starts swipl
 
 In the image, `~/prolog-utilities` holds the built source tree,
 `~/lib/sbcl` the SWI-Prolog modules (already on the `sbcl` search path) and
-`~/lib/gprolog` the GNU Prolog libraries; the compilers are included.
+`~/lib/gprolog` the GNU Prolog libraries; the compilers are included, as are
+`node` and `git`, so the image can be the job container of CI workflows.
 
 
 Using the modules
