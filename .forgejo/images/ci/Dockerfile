@@ -20,11 +20,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY install-deps.sh /tmp/install-deps.sh
 RUN /tmp/install-deps.sh \
  && apt-get install -y --no-install-recommends \
-        nodejs \
         git git-lfs \
         docker-cli \
         docker-buildx \
  && rm -rf /var/lib/apt/lists/* /tmp/install-deps.sh
+
+# Debian 13 contains only node v20, but we need >= v22 so we install v24.
+COPY --from=node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 /usr/local/bin/node /usr/local/bin/node
 
 # The built GNU Prolog libraries (libpltoolbox-Linux.a, libplregexp-Linux.a, ...)
 # from the published image, for projects that link them with gplc and run in
