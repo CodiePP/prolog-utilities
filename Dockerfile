@@ -22,10 +22,12 @@ LABEL org.opencontainers.image.title="prolog-utilities" \
 COPY ci/install-deps.sh /tmp/install-deps.sh
 RUN /tmp/install-deps.sh \
  && env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nodejs \
         git git-lfs \
  && rm -rf /var/lib/apt/lists/* /tmp/install-deps.sh \
  && useradd --create-home --shell /bin/bash user
+
+# Debian 13 contains only node v20, but we need >= v22 so we install v24.
+COPY --from=node:24-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 /usr/local/bin/node /usr/local/bin/node
 
 USER user
 WORKDIR /home/user
