@@ -82,11 +82,14 @@ jobs:
         run: |
           # without the plugin docker misparses this as `docker --name` ("unknown flag: --name")
           docker buildx version || { echo "docker buildx plugin missing in ${{ vars.CI_IMAGE }}; rebuild it with ci/build-image.sh"; exit 1; }
-          # network=host: the builder shares the dind network instead of a nested
-          # bridge (large TLS packets to ghcr.io timed out there, MTU); recreated so an
-          # old builder without the option is not reused
+          # the builder container lives on the dind and outlives the job; buildx here has
+          # no record of it (fresh ~/.docker), so remove the container itself.
+          # The dind runs with --mtu=1280 and clamps the TCP MSS to 1240 (TCPMSS rule
+          # in its pod spec): 1370-byte packets from the nodes are lost, which showed
+          # up as TLS handshake timeouts to ghcr.io and the Forgejo host.
+          docker rm -f buildx_buildkit_multiarch-builder0 2>/dev/null || true
           docker buildx rm multiarch-builder 2>/dev/null || true
-          docker buildx create --name multiarch-builder --driver docker-container --driver-opt network=host --use
+          docker buildx create --name multiarch-builder --driver docker-container --use
           docker buildx inspect --bootstrap
 
       - name: Build and push
