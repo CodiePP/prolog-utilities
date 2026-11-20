@@ -21,6 +21,7 @@ COPY install-deps.sh /tmp/install-deps.sh
 RUN /tmp/install-deps.sh \
  && apt-get install -y --no-install-recommends \
         git git-lfs \
+        openssh-client \
         docker-cli \
         docker-buildx \
  && rm -rf /var/lib/apt/lists/* /tmp/install-deps.sh

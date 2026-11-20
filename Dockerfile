@@ -18,11 +18,13 @@ LABEL org.opencontainers.image.title="prolog-utilities" \
       org.opencontainers.image.licenses="GPL-3.0-or-later"
 
 # nodejs and git: so the image can be the job container of a Forgejo or GitHub
-# workflow, whose actions (checkout) need node and git inside the container
+# workflow, whose actions (checkout) need node and git inside the container;
+# openssh-client for ssh-keygen: SSH-signed git commits (gpg.format=ssh) and their
+# verification
 COPY ci/install-deps.sh /tmp/install-deps.sh
 RUN /tmp/install-deps.sh \
  && env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        git git-lfs \
+        git git-lfs openssh-client \
  && rm -rf /var/lib/apt/lists/* /tmp/install-deps.sh \
  && useradd --create-home --shell /bin/bash user
 
